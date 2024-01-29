@@ -97,7 +97,7 @@ CONTAINS
     INTEGER :: IRET
     INTEGER :: IPITCH_DST, IPITCH_SRC
     INTEGER(KIND=8) :: IWIDTH, IHEIGHT, ISHP_SRC(${rank+1}$), ISHP_DST(${rank+1}$)
-    INTEGER(KIND=8) :: ISTRIDES_SRC(${rank}$), ISTRIDES_DST(${rank}$)
+    INTEGER(KIND=8) :: ISTRIDES_SRC(${rank+1}$), ISTRIDES_DST(${rank+1}$)
     INTEGER(KIND=CUDA_STREAM_KIND) :: STREAM
     TYPE(C_PTR) :: HSTPTR
     TYPE(C_DEVPTR) :: DEVPTR
@@ -127,6 +127,9 @@ CONTAINS
     ISTRIDES_SRC(${d+1}$) = LOC (SRC(${next_slice('SRC')}$)) - LOC (SRC (${this_slice('SRC')}$))
     ISTRIDES_DST(${d+1}$) = LOC (DST(${next_slice('DST')}$)) - LOC (DST (${this_slice('DST')}$))
 #:endfor
+
+    ISTRIDES_SRC(${rank+1}$) = ISTRIDES_SRC(${rank}$) * SIZE(SRC, ${rank}$)
+    ISTRIDES_DST(${rank+1}$) = ISTRIDES_DST(${rank}$) * SIZE(DST, ${rank}$)
 
     ISHP_SRC(1) = 1
     ISHP_SRC(2:) = SHAPE(SRC)
