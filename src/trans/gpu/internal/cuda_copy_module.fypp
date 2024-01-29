@@ -1,0 +1,229 @@
+#! (C) Copyright 2022- ECMWF.
+#! (C) Copyright 2022- Meteo-France.
+#! (C) Copyright 2023- NVIDIA
+#!
+#! This software is licensed under the terms of the Apache Licence Version 2.0
+#! which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
+#! In applying this licence, ECMWF does not waive the privileges and immunities
+#! granted to it by virtue of its status as an intergovernmental organisation
+#! nor does it submit to any jurisdiction.
+
+#! fypp cuda_copy_module.fypp -m collections -m itertools > cuda_copy_module.f90
+
+#:set shape = lambda rank : ','.join([':'] * rank)
+#:set function_name = lambda dt: str(dt.type).upper() + '_' + str(dt.kind).upper()
+
+MODULE CUDA_COPY_MODULE
+
+USE OPENACC
+USE CUDAFOR
+
+#:set DataType = collections.namedtuple('DataType', ['type', 'kind'])
+
+#:set fields = list(itertools.product(list(range(2, 5)), [DataType("real", "4"), DataType("real", "8")]))
+
+IMPLICIT NONE
+
+PRIVATE
+
+PUBLIC :: COPY, NH2D, ND2H, ACC_HANDLE_KIND
+
+INTEGER, PARAMETER :: NH2D = CUDAMEMCPYHOSTTODEVICE , ND2H = CUDAMEMCPYDEVICETOHOST
+
+INTERFACE COPY
+#:for rank, datatype in fields
+MODULE PROCEDURE COPY_${rank}$_${function_name(datatype)}$
+#:endfor
+END INTERFACE
+
+CONTAINS
+
+#:for rank, datatype in fields
+#:set ftn = f"{rank}_{function_name(datatype)}".upper()
+#:set dt = f"{datatype.type}({datatype.kind})".upper()
+
+  SUBROUTINE COPY_${ftn}$(DST, SRC, KDIR, QUEUE)
+    ${dt}$, TARGET :: DST(${shape(rank)}$), SRC(${shape(rank)}$)
+    ${dt}$, POINTER :: DST_PTR(${shape(rank)}$), SRC_PTR(${shape(rank)}$)
+    INTEGER (KIND=4), INTENT (IN) :: KDIR
+    INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+
+    SRC_PTR => SRC
+    DST_PTR => DST
+
+    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+      CALL COPY_${ftn}$_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
+    ELSE
+      CALL COPY_${ftn}$_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
+    ENDIF
+  END SUBROUTINE
+
+  SUBROUTINE COPY_${ftn}$_1D(DST, SRC, KDIR, QUEUE)
+    ${dt}$, CONTIGUOUS, POINTER :: DST (${shape(rank)}$), SRC (${shape(rank)}$)
+    INTEGER (KIND=4),           INTENT (IN) :: KDIR
+    INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+
+    INTEGER (KIND=8) :: ISIZE
+
+    ISIZE = KIND (DST) * SIZE(DST(${','.join([':'] * rank)}$))
+    IF (KDIR == NH2D) THEN
+      !$ACC HOST_DATA USE_DEVICE(DST)
+      IF(PRESENT(QUEUE))THEN
+        CALL ACC_MEMCPY_TO_DEVICE_ASYNC(DST, SRC, ISIZE, QUEUE)
+      ELSE
+        CALL ACC_MEMCPY_TO_DEVICE(DST, SRC, ISIZE)
+      ENDIF
+      !$ACC END HOST_DATA
+    ELSEIF (KDIR == ND2H) THEN
+      !$ACC HOST_DATA USE_DEVICE(SRC)
+      IF(PRESENT(QUEUE))THEN
+        CALL ACC_MEMCPY_FROM_DEVICE_ASYNC(DST, SRC, ISIZE, QUEUE)
+      ELSE
+        CALL ACC_MEMCPY_FROM_DEVICE (DST, SRC, ISIZE)
+      ENDIF
+      !$ACC END HOST_DATA
+    ENDIF
+
+  END SUBROUTINE
+  SUBROUTINE COPY_${ftn}$_2D(DST, SRC, KDIR, QUEUE)
+    ${dt}$, POINTER :: DST (${shape(rank)}$), SRC (${shape(rank)}$)
+    INTEGER (KIND=4),           INTENT (IN) :: KDIR
+    INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
+    INTEGER :: NEXT_CONTIG_DIM_DST, NEXT_CONTIG_DIM_SRC
+
+    INTEGER :: LAST_CONTIG_DIM
+
+    INTEGER :: IRET
+    INTEGER :: IPITCH_DST, IPITCH_SRC
+    INTEGER(KIND=8) :: IWIDTH, IHEIGHT, ISHP_SRC(${rank+1}$), ISHP_DST(${rank+1}$)
+    INTEGER(KIND=8) :: ISTRIDES_SRC(${rank}$), ISTRIDES_DST(${rank}$)
+    INTEGER(KIND=CUDA_STREAM_KIND) :: STREAM
+    TYPE(C_PTR) :: HSTPTR
+    TYPE(C_DEVPTR) :: DEVPTR
+
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(DST, 0)
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(SRC, 0)
+    NEXT_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(DST, LAST_CONTIG_DIM_DST+1)
+    NEXT_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(SRC, LAST_CONTIG_DIM_SRC+1)
+
+    ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
+    IF (KDIR == NH2D) THEN
+      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (NEXT_CONTIG_DIM_SRC /= ${rank}$) CALL ABOR1("host must have at most one non-cont dim")
+      LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
+    ELSE IF (KDIR == ND2H) THEN
+      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (NEXT_CONTIG_DIM_DST /= ${rank}$) CALL ABOR1("host must have at most one non-cont dim")
+      LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
+    ENDIF
+
+#:for d in range(rank)
+#:set lb = lambda arr, i: f'LBOUND({arr}, {i+1})'
+#:set lbnds = lambda arr, start, end: [lb(arr, i) for i in range(start, end)]
+#:set this_slice = lambda arr: ', '.join(lbnds(arr, 0, rank))
+#:set next_slice = lambda arr: ', '.join(lbnds(arr, 0, d) + [lb(arr, d)+'+1'] + lbnds(arr, d+1, rank))
+
+    ISTRIDES_SRC(${d+1}$) = LOC (SRC(${next_slice('SRC')}$)) - LOC (SRC (${this_slice('SRC')}$))
+    ISTRIDES_DST(${d+1}$) = LOC (DST(${next_slice('DST')}$)) - LOC (DST (${this_slice('DST')}$))
+#:endfor
+
+    ISHP_SRC(1) = 1
+    ISHP_SRC(2:) = SHAPE(SRC)
+    ISHP_DST(1) = 1
+    ISHP_DST(2:) = SHAPE(DST)
+    IWIDTH = PRODUCT(ISHP_DST(1:LAST_CONTIG_DIM+1)) * KIND(DST)
+    IHEIGHT = PRODUCT(ISHP_DST(LAST_CONTIG_DIM+2:NEXT_CONTIG_DIM_SRC+1))
+
+    IPITCH_SRC = ISTRIDES_SRC(LAST_CONTIG_DIM+1)
+    IPITCH_DST = ISTRIDES_DST(LAST_CONTIG_DIM+1)
+
+  #:set ar = lambda arr: ','.join(lbnds(arr, 0, rank))
+    IF (KDIR == NH2D) THEN
+      HSTPTR = C_LOC(SRC(${ar('SRC')}$))
+      !$ACC HOST_DATA USE_DEVICE(DST)
+      DEVPTR = C_DEVLOC(DST(${ar('DST')}$))
+      !$ACC END HOST_DATA
+      IF(PRESENT(QUEUE)) THEN
+        STREAM = ACC_GET_CUDA_STREAM(QUEUE)
+        IRET = CUDAMEMCPY2DASYNC(DEVPTR, IPITCH_DST, &
+                               & HSTPTR, IPITCH_SRC, &
+                               & IWIDTH, IHEIGHT, &
+                               & STREAM=STREAM)
+      ELSE
+        IRET = CUDAMEMCPY2D(DEVPTR, IPITCH_DST, &
+                          & HSTPTR, IPITCH_SRC, &
+                          & IWIDTH, IHEIGHT)
+      ENDIF
+      IF (IRET /= CUDASUCCESS) CALL ABOR1("error in H2D")
+    ELSEIF (KDIR == ND2H) THEN
+      !$ACC HOST_DATA USE_DEVICE(SRC)
+      DEVPTR = C_DEVLOC(SRC(${ar('SRC')}$))
+      !$ACC END HOST_DATA
+      HSTPTR = C_LOC(DST(${ar('DST')}$))
+      IF(PRESENT(QUEUE)) THEN
+        STREAM = ACC_GET_CUDA_STREAM(QUEUE)
+        IRET = CUDAMEMCPY2DASYNC(HSTPTR, IPITCH_DST, &
+                               & DEVPTR, IPITCH_SRC, &
+                               & IWIDTH, IHEIGHT, &
+                               & STREAM=STREAM)
+      ELSE
+        IRET = CUDAMEMCPY2D(HSTPTR, IPITCH_DST, &
+                          & DEVPTR, IPITCH_SRC, &
+                          & IWIDTH, IHEIGHT)
+      ENDIF
+      IF (IRET /= CUDASUCCESS) CALL ABOR1("error in D2H")
+    ENDIF
+  END SUBROUTINE
+#:endfor
+
+
+#:for rank, datatype in fields
+#:set ftn = f"{rank}_{function_name(datatype)}".upper()
+#:set dt = f"{datatype.type}({datatype.kind})".upper()
+
+  INTEGER FUNCTION GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(PTR, AFTER) RESULT (JDIM)
+  ${dt}$, POINTER :: PTR (${shape(rank)}$)
+  INTEGER :: AFTER
+  INTEGER(KIND=8) :: IPREVIOUS_STRIDE, ITHIS_STRIDE, ISIZE
+  INTEGER :: J, LB(${rank}$)
+
+  ! assume that dimension all dimensions before AFTER are contiguous...
+
+  LB = LBOUND(PTR)
+  IF (AFTER == 0) THEN
+    IPREVIOUS_STRIDE = KIND (PTR)
+  ENDIF
+
+#:for d in range (1, rank+1)
+  #:set ind0 = ""
+  #:set ind1 = ""
+  #:for i in range(1,rank+1)
+    #:set ind0 = ind0 + "LB({}), ".format(i)
+    #:set ind1 = ind1 + "LB({}){}, ".format(i,"+1"*(i==d))
+  #:endfor
+  #:set ind0 = ind0[:-2]
+  #:set ind1 = ind1[:-2]
+  ITHIS_STRIDE = LOC (PTR (${ind1}$)) - LOC (PTR (${ind0}$))
+  IF (AFTER < ${d}$) THEN
+   #:if d == 1
+    ISIZE = 1
+   #:else
+    ISIZE = SIZE(PTR, ${d-1}$)
+   #:endif
+    IF (SIZE(PTR, ${d}$) /= 1 .AND. IPREVIOUS_STRIDE * ISIZE /= ITHIS_STRIDE) THEN
+      JDIM = ${d-1}$
+      RETURN
+    ENDIF
+    IPREVIOUS_STRIDE = IPREVIOUS_STRIDE * ISIZE
+  ELSE IF (AFTER == ${d}$) THEN
+    IPREVIOUS_STRIDE = ITHIS_STRIDE
+  ENDIF
+
+#:endfor
+  JDIM = ${rank}$
+  END FUNCTION GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$
+
+#:endfor
+
+END MODULE CUDA_COPY_MODULE
