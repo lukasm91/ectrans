@@ -82,7 +82,7 @@ template <typename Gemm, typename Real> void free_gemm_cache(float *, size_t) {
 template <typename Gemm, typename Real>
 void run_group_graph(Gemm &&gemm, int const m, int const *n, int const *k,
                      Real alpha, const Real *A, int lda, int const *offsetsA,
-                     const Real *B, int ldb, int const *offsetsB, Real beta,
+                     const Real *B, int *ldb, int const *offsetsB, Real beta,
                      Real *C, int ldc, int const *offsetsC, int batchCount,
                      cudaStream_t stream, int blas_id,
                      void *growing_allocator) {
@@ -130,7 +130,7 @@ void run_group_graph(Gemm &&gemm, int const m, int const *n, int const *k,
 
       CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
       gemm(stream, m, n[i], k[i], alpha, A + offsetsA[i], lda, B + offsetsB[i],
-           ldb, beta, C + offsetsC[i], ldc);
+           ldb[i], beta, C + offsetsC[i], ldc);
       cudaGraph_t my_graph;
       CUDA_CHECK(cudaStreamEndCapture(stream, &my_graph));
       cudaGraphNode_t my_node;
@@ -153,14 +153,14 @@ void run_group_graph(Gemm &&gemm, int const m, int const *n, int const *k,
 template <typename Gemm, typename Real>
 void run_group(Gemm &&gemm, int m, int const *n, int const *k, Real alpha,
                const Real *A, int lda, int const *offsetsA, const Real *B,
-               int ldb, int const *offsetsB, Real beta, Real *C, int ldc,
+               int *ldb, int const *offsetsB, Real beta, Real *C, int ldc,
                int const *offsetsC, int batchCount, cudaStream_t stream,
                int = -1, void * = nullptr) {
   for (int i = 0; i < batchCount; ++i) {
     if (m == 0 || n[i] == 0 || k[i] == 0)
       continue;
     gemm(stream, m, n[i], k[i], alpha, A + offsetsA[i], lda, B + offsetsB[i],
-         ldb, beta, C + offsetsC[i], ldc);
+         ldb[i], beta, C + offsetsC[i], ldc);
   }
 }
 
@@ -291,7 +291,7 @@ public:
 template <cublasOperation_t TransA, cublasOperation_t TransB>
 void cutlass_sgemm_wrapper_grouped_op(int blas_id, int m, int *n, int *k,
                                       float alpha, const float *A, int lda,
-                                      int *offsetsA, const float *B, int ldb,
+                                      int *offsetsA, const float *B, int *ldb,
                                       int *offsetsB, float beta, float *C,
                                       int ldc, int *offsetsC, int batchCount,
                                       cudaStream_t stream,
@@ -318,7 +318,7 @@ void cutlass_sgemm_wrapper_grouped_op(int blas_id, int m, int *n, int *k,
 void cutlass_sgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
                                    cublasOperation_t transb, int m, int *n,
                                    int *k, float alpha, const float *A, int lda,
-                                   int *offsetsA, const float *B, int ldb,
+                                   int *offsetsA, const float *B, int *ldb,
                                    int *offsetsB, float beta, float *C, int ldc,
                                    int *offsetsC, int batchCount,
                                    cudaStream_t stream,
@@ -379,7 +379,7 @@ private:
 void cublas_sgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
                                   cublasOperation_t transb, int m, int *n,
                                   int *k, float alpha, const float *A, int lda,
-                                  int *offsetsA, const float *B, int ldb,
+                                  int *offsetsA, const float *B, int *ldb,
                                   int *offsetsB, float beta, float *C, int ldc,
                                   int *offsetsC, int batchCount,
                                   cudaStream_t stream,
@@ -393,7 +393,7 @@ void cublas_dgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
                                   cublasOperation_t transb, int m, int *n,
                                   int *k, double alpha, const double *A,
                                   int lda, int *offsetsA, const double *B,
-                                  int ldb, int *offsetsB, double beta,
+                                  int *ldb, int *offsetsB, double beta,
                                   double *C, int ldc, int *offsetsC,
                                   int batchCount, cudaStream_t stream, void *) {
   using namespace detail;
@@ -434,7 +434,7 @@ void cublas_sgemm_wrapper(cublasOperation_t transa, cublasOperation_t transb,
 void blas_sgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
                                 cublasOperation_t transb, int m, int *n, int *k,
                                 float alpha, const float *A, int lda,
-                                int *offsetsA, const float *B, int ldb,
+                                int *offsetsA, const float *B, int *ldb,
                                 int *offsetsB, float beta, float *C, int ldc,
                                 int *offsetsC, int batchCount, size_t stream,
                                 void *growing_allocator) {
@@ -452,7 +452,7 @@ void blas_sgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
 void blas_dgemm_wrapper_grouped(int blas_id, cublasOperation_t transa,
                                 cublasOperation_t transb, int m, int *n, int *k,
                                 double alpha, const double *A, int lda,
-                                int *offsetsA, const double *B, int ldb,
+                                int *offsetsA, const double *B, int *ldb,
                                 int *offsetsB, double beta, double *C, int ldc,
                                 int *offsetsC, int batchCount, size_t stream,
                                 void *growing_allocator) {
