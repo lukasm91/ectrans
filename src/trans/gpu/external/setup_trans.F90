@@ -475,17 +475,17 @@ DO JMLOC=1,D%NUMP
     ZAS0(1:KDGLU,1:ILS)=S%FA(JMLOC)%RPNMS(1:KDGLU,1:ILS)
   ENDIF
 ENDDO
-write(nout,*)'ZAA:',size(ZAA)
-write(nout,*)'ZAS:',size(ZAS)
+write(nout,'("ZAA: ", I, " B")') size(ZAA,KIND=8)*sizeof(ZAA(1))
+write(nout,'("ZAS: ", I, " B")') size(ZAS,KIND=8)*sizeof(ZAS(1))
 !$ACC ENTER DATA COPYIN(ZAA,ZAS)
 IF (KMLOC0 > 0) THEN
-  write(nout,*)'ZAA0:',size(ZAA0)
-  write(nout,*)'ZAS0:',size(ZAS0)
+  write(nout,'("ZAA0: ", I, " B")') size(ZAA0)*sizeof(ZAA0(1,1))
+  write(nout,'("ZAS0: ", I, " B")') size(ZAS0)*sizeof(ZAS0(1,1))
   !$ACC ENTER DATA COPYIN(ZAA0,ZAS0)
 ENDIF
 
 ALLOCATE(ZEPSNM(d%nump,0:R%NTMAX+2))
-write(nout,*)'ZEPSNM :',size(ZEPSNM)
+write(nout,'("ZEPSNM: ", I, " B")') size(ZEPSNM)*sizeof(ZEPSNM(1, 1))
 ZEPSNM = 0._JPRBT
 CALL PREPSNM
 !$ACC ENTER DATA COPYIN(ZEPSNM)

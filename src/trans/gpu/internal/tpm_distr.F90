@@ -13,7 +13,7 @@ MODULE TPM_DISTR
 
 ! Module for distributed memory environment.
 
-USE PARKIND_ECTRANS  ,ONLY : JPIM     ,JPRBT
+USE PARKIND_ECTRANS  ,ONLY : JPIM     ,JPRBT, JPIB
 
 IMPLICIT NONE
 
@@ -161,7 +161,7 @@ INTEGER(KIND=JPIM) ,ALLOCATABLE :: NGPTOTL(:,:) ! Number of grid columns on each
 REAL(KIND=JPRBT) ,ALLOCATABLE :: RWEIGHT(:) ! Weight per grid-point (if weighted distribution)
 INTEGER(KIND=JPIM) ,ALLOCATABLE :: NPROCA_GP(:) ! Number of grid-points per a-set
 
-INTEGER(KIND=JPIM), ALLOCATABLE :: OFFSETS_GEMM1(:), OFFSETS_GEMM2(:), OFFSETS_GEMM_MATRIX(:)
+INTEGER(KIND=JPIB), ALLOCATABLE :: OFFSETS_GEMM1(:), OFFSETS_GEMM2(:), OFFSETS_GEMM_MATRIX(:)
 INTEGER(KIND=JPIM), ALLOCATABLE :: LEGENDRE_MATRIX_STRIDES(:)
 
 END TYPE DISTR_TYPE
@@ -186,7 +186,7 @@ INTEGER(KIND=JPIM) ,POINTER :: D_NPTRLS(:) ! Pointer to first lat. (F.S)
 ! The offsets in the input and output arrays to the gemms.
 ! (1) are the offsets in the "inputs" of dirtrans ("outputs" invtrans)
 ! (2) are the offsets in the "outputs" of invtrans ("inputs" dirtrans)
-INTEGER(KIND=JPIM), POINTER :: D_OFFSETS_GEMM1(:), D_OFFSETS_GEMM2(:)
+INTEGER(KIND=JPIB), POINTER :: D_OFFSETS_GEMM1(:), D_OFFSETS_GEMM2(:)
 
 TYPE(DISTR_TYPE),ALLOCATABLE,TARGET :: DISTR_RESOL(:)
 TYPE(DISTR_TYPE),POINTER     :: D
