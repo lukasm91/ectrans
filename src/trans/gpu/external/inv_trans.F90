@@ -638,6 +638,9 @@ IF (LSYNC_TRANS) THEN
 ENDIF
 CALL GSTATS(420,1)
 !     ------------------------------------------------------------------
+FLUSH(6)
+FLUSH(0)
+FLUSH(NOUT)
 
 !endif INTERFACE
 
