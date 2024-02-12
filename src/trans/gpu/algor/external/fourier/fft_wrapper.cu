@@ -149,9 +149,6 @@ void execute_fft(typename Type::real *data_real,
   growing_allocator_register_free_c(growing_allocator,
                                     free_fft_cache<Type, Direction>);
 
-  size_t allocation_size =
-      plan_fft<Type, Direction>(kfield, loens, offsets, nfft);
-
   using real = typename Type::real;
   using cmplx = typename Type::cmplx;
 
