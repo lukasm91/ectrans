@@ -104,14 +104,51 @@ void free_fft_cache(float *, size_t) {
 }
 
 template <class Type, cufftType Direction>
+size_t plan_fft(int kfield, int *loens, int *offsets, int nfft) {
+
+  constexpr bool is_forward = Direction == CUFFT_R2C || Direction == CUFFT_D2Z;
+
+  auto &fftPlansCache =
+      get_fft_plan_cache<Type, Direction>(); // kfield -> handles
+  auto fftPlans = fftPlansCache.find(kfield);
+  if (fftPlans == fftPlansCache.end()) {
+    // the fft plans do not exist yet
+    std::vector<cufftHandle> newPlans;
+    newPlans.resize(nfft);
+    for (int i = 0; i < nfft; ++i) {
+      int nloen = loens[i];
+
+      cufftHandle plan;
+      CUFFT_CHECK(cufftCreate(&plan));
+      CUFFT_CHECK(cufftSetAutoAllocation(plan, false));
+      int dist = offsets[i + 1] - offsets[i];
+      int embed[] = {1};
+      size_t worksize;
+      CUFFT_CHECK(cufftMakePlanMany(
+          plan, 1, &nloen, embed, 1, is_forward ? dist : dist / 2, embed, 1,
+          is_forward ? dist / 2 : dist, Direction, kfield, &worksize));
+      newPlans[i] = plan;
+    }
+    fftPlans = fftPlansCache.insert({kfield, newPlans}).first;
+  }
+
+  size_t total_worksize = 0;
+  for (auto const &plan : fftPlans->second) {
+    size_t local_worksize;
+    CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
+    total_worksize += local_worksize;
+  }
+  return total_worksize;
+}
+template <class Type, cufftType Direction>
 void execute_fft(typename Type::real *data_real,
                  typename Type::cmplx *data_complex, int kfield, int *loens,
-                 int *offsets, int nfft, void *growing_allocator) {
+                 int *offsets, int nfft, void *growing_allocator,
+                 void *buffer) {
 
   growing_allocator_register_free_c(growing_allocator,
                                     free_fft_cache<Type, Direction>);
 
-  constexpr bool is_forward = Direction == CUFFT_R2C || Direction == CUFFT_D2Z;
   using real = typename Type::real;
   using cmplx = typename Type::cmplx;
 
@@ -139,25 +176,16 @@ void execute_fft(typename Type::real *data_real,
     auto &fftPlansCache =
         get_fft_plan_cache<Type, Direction>(); // kfield -> handles
     auto fftPlans = fftPlansCache.find(kfield);
-    if (fftPlans == fftPlansCache.end()) {
-      // the fft plans do not exist yet
-      std::vector<cufftHandle> newPlans;
-      newPlans.resize(nfft);
-      for (int i = 0; i < nfft; ++i) {
-        int nloen = loens[i];
+    if (fftPlans == fftPlansCache.end())
+      exit(EXIT_FAILURE);
 
-        cufftHandle plan;
-        CUFFT_CHECK(cufftCreate(&plan));
-        int dist = offsets[i + 1] - offsets[i];
-        int embed[] = {1};
-        CUFFT_CHECK(cufftPlanMany(
-            &plan, 1, &nloen, embed, 1, is_forward ? dist : dist / 2, embed, 1,
-            is_forward ? dist / 2 : dist, Direction, kfield));
-        newPlans[i] = plan;
-      }
-      fftPlansCache.insert({kfield, newPlans});
+    size_t total_worksize = 0;
+    for (auto const &plan : fftPlans->second) {
+      size_t local_worksize;
+      CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
+      CUFFT_CHECK(cufftSetWorkArea(plan, (char *)buffer + total_worksize));
+      total_worksize += local_worksize;
     }
-    fftPlans = fftPlansCache.find(kfield);
 
     // create a temporary stream
     cudaStream_t stream;
@@ -209,26 +237,38 @@ void execute_fft(typename Type::real *data_real,
 extern "C" {
 void execute_dir_fft_float(float *data_real, cufftComplex *data_complex,
                            int kfield, int *loens, int *offsets, int nfft,
-                           void *growing_allocator) {
+                           void *growing_allocator, void *buffer) {
   execute_fft<Float, CUFFT_R2C>(data_real, data_complex, kfield, loens, offsets,
-                                nfft, growing_allocator);
+                                nfft, growing_allocator, buffer);
 }
 void execute_inv_fft_float(cufftComplex *data_complex, float *data_real,
                            int kfield, int *loens, int *offsets, int nfft,
-                           void *growing_allocator) {
+                           void *growing_allocator, void *buffer) {
   execute_fft<Float, CUFFT_C2R>(data_real, data_complex, kfield, loens, offsets,
-                                nfft, growing_allocator);
+                                nfft, growing_allocator, buffer);
 }
 void execute_dir_fft_double(double *data_real, cufftDoubleComplex *data_complex,
                             int kfield, int *loens, int *offsets, int nfft,
-                            void *growing_allocator) {
+                            void *growing_allocator, void *buffer) {
   execute_fft<Double, CUFFT_D2Z>(data_real, data_complex, kfield, loens,
-                                 offsets, nfft, growing_allocator);
+                                 offsets, nfft, growing_allocator, buffer);
 }
 void execute_inv_fft_double(cufftDoubleComplex *data_complex, double *data_real,
                             int kfield, int *loens, int *offsets, int nfft,
-                            void *growing_allocator) {
+                            void *growing_allocator, void *buffer) {
   execute_fft<Double, CUFFT_Z2D>(data_real, data_complex, kfield, loens,
-                                 offsets, nfft, growing_allocator);
+                                 offsets, nfft, growing_allocator, buffer);
+}
+size_t plan_dir_fft_float(int kfield, int *loens, int *offsets, int nfft) {
+  return plan_fft<Float, CUFFT_R2C>(kfield, loens, offsets, nfft);
+}
+size_t plan_inv_fft_float(int kfield, int *loens, int *offsets, int nfft) {
+  return plan_fft<Float, CUFFT_C2R>(kfield, loens, offsets, nfft);
+}
+size_t plan_dir_fft_double(int kfield, int *loens, int *offsets, int nfft) {
+  return plan_fft<Double, CUFFT_D2Z>(kfield, loens, offsets, nfft);
+}
+size_t plan_inv_fft_double(int kfield, int *loens, int *offsets, int nfft) {
+  return plan_fft<Double, CUFFT_Z2D>(kfield, loens, offsets, nfft);
 }
 }
