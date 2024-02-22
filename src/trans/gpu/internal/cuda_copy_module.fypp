@@ -8,7 +8,7 @@
 #! granted to it by virtue of its status as an intergovernmental organisation
 #! nor does it submit to any jurisdiction.
 
-#! fypp cuda_copy_module.fypp -m collections -m itertools > cuda_copy_module.f90
+#! fypp cuda_copy_module.fypp -m collections -m itertools > cuda_copy_module.F90
 
 #:set shape = lambda rank : ','.join([':'] * rank)
 #:set function_name = lambda dt: str(dt.type).upper() + '_' + str(dt.kind).upper()
@@ -17,6 +17,7 @@ MODULE CUDA_COPY_MODULE
 
 USE OPENACC
 USE CUDAFOR
+USE ISO_C_BINDING
 
 #:set DataType = collections.namedtuple('DataType', ['type', 'kind'])
 
@@ -28,7 +29,7 @@ PRIVATE
 
 PUBLIC :: COPY, NH2D, ND2H, ACC_HANDLE_KIND
 
-INTEGER, PARAMETER :: NH2D = CUDAMEMCPYHOSTTODEVICE , ND2H = CUDAMEMCPYDEVICETOHOST
+INTEGER(4), PARAMETER :: NH2D = CUDAMEMCPYHOSTTODEVICE , ND2H = CUDAMEMCPYDEVICETOHOST
 
 INTERFACE COPY
 #:for rank, datatype in fields
@@ -63,9 +64,9 @@ CONTAINS
     INTEGER (KIND=4),           INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
 
-    INTEGER (KIND=8) :: ISIZE
+    INTEGER (KIND=C_SIZE_T) :: ISIZE
 
-    ISIZE = KIND (DST) * SIZE(DST(${','.join([':'] * rank)}$))
+    ISIZE = KIND (DST) * SIZE(DST(${','.join([':'] * rank)}$), KIND=C_SIZE_T)
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -96,8 +97,8 @@ CONTAINS
 
     INTEGER :: IRET
     INTEGER :: IPITCH_DST, IPITCH_SRC
-    INTEGER(KIND=8) :: IWIDTH, IHEIGHT, ISHP_SRC(${rank+1}$), ISHP_DST(${rank+1}$)
-    INTEGER(KIND=8) :: ISTRIDES_SRC(${rank+1}$), ISTRIDES_DST(${rank+1}$)
+    INTEGER(KIND=C_SIZE_T) :: IWIDTH, IHEIGHT, ISHP_SRC(${rank+1}$), ISHP_DST(${rank+1}$)
+    INTEGER(KIND=C_SIZE_T) :: ISTRIDES_SRC(${rank+1}$), ISTRIDES_DST(${rank+1}$)
     INTEGER(KIND=CUDA_STREAM_KIND) :: STREAM
     TYPE(C_PTR) :: HSTPTR
     TYPE(C_DEVPTR) :: DEVPTR
@@ -188,7 +189,7 @@ CONTAINS
   INTEGER FUNCTION GET_LAST_CONTIGUOUS_DIMENSION_${ftn}$(PTR, AFTER) RESULT (JDIM)
   ${dt}$, POINTER :: PTR (${shape(rank)}$)
   INTEGER :: AFTER
-  INTEGER(KIND=8) :: IPREVIOUS_STRIDE, ITHIS_STRIDE, ISIZE
+  INTEGER(KIND=C_SIZE_T) :: IPREVIOUS_STRIDE, ITHIS_STRIDE, ISIZE
   INTEGER :: J, LB(${rank}$)
 
   ! assume that dimension all dimensions before AFTER are contiguous...
