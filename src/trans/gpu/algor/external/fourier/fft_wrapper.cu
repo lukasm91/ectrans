@@ -104,7 +104,7 @@ void free_fft_cache(float *, size_t) {
 }
 
 template <class Type, cufftType Direction>
-size_t plan_fft(int kfield, int *loens, int *offsets, int nfft) {
+size_t plan_fft(int kfield, int *loens, int *offsets, int nfft, bool allocate) {
 
   constexpr bool is_forward = Direction == CUFFT_R2C || Direction == CUFFT_D2Z;
 
@@ -120,7 +120,9 @@ size_t plan_fft(int kfield, int *loens, int *offsets, int nfft) {
 
       cufftHandle plan;
       CUFFT_CHECK(cufftCreate(&plan));
-      CUFFT_CHECK(cufftSetAutoAllocation(plan, false));
+      if (!allocate) {
+        CUFFT_CHECK(cufftSetAutoAllocation(plan, false));
+      }
       int dist = offsets[i + 1] - offsets[i];
       int embed[] = {1};
       size_t worksize;
@@ -179,12 +181,14 @@ void execute_fft(typename Type::real *data_real,
     if (fftPlans == fftPlansCache.end())
       exit(EXIT_FAILURE);
 
-    size_t total_worksize = 0;
-    for (auto const &plan : fftPlans->second) {
-      size_t local_worksize;
-      CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
-      CUFFT_CHECK(cufftSetWorkArea(plan, (char *)buffer + total_worksize));
-      total_worksize += local_worksize;
+    if (buffer) {
+      size_t total_worksize = 0;
+      for (auto const &plan : fftPlans->second) {
+        size_t local_worksize;
+        CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
+        CUFFT_CHECK(cufftSetWorkArea(plan, (char *)buffer + total_worksize));
+        total_worksize += local_worksize;
+      }
     }
 
     // create a temporary stream
@@ -259,16 +263,20 @@ void execute_inv_fft_double(cufftDoubleComplex *data_complex, double *data_real,
   execute_fft<Double, CUFFT_Z2D>(data_real, data_complex, kfield, loens,
                                  offsets, nfft, growing_allocator, buffer);
 }
-size_t plan_dir_fft_float(int kfield, int *loens, int *offsets, int nfft) {
-  return plan_fft<Float, CUFFT_R2C>(kfield, loens, offsets, nfft);
+size_t plan_dir_fft_float(int kfield, int *loens, int *offsets, int nfft,
+                          int allocate) {
+  return plan_fft<Float, CUFFT_R2C>(kfield, loens, offsets, nfft, allocate);
 }
-size_t plan_inv_fft_float(int kfield, int *loens, int *offsets, int nfft) {
-  return plan_fft<Float, CUFFT_C2R>(kfield, loens, offsets, nfft);
+size_t plan_inv_fft_float(int kfield, int *loens, int *offsets, int nfft,
+                          int allocate) {
+  return plan_fft<Float, CUFFT_C2R>(kfield, loens, offsets, nfft, allocate);
 }
-size_t plan_dir_fft_double(int kfield, int *loens, int *offsets, int nfft) {
-  return plan_fft<Double, CUFFT_D2Z>(kfield, loens, offsets, nfft);
+size_t plan_dir_fft_double(int kfield, int *loens, int *offsets, int nfft,
+                           int allocate) {
+  return plan_fft<Double, CUFFT_D2Z>(kfield, loens, offsets, nfft, allocate);
 }
-size_t plan_inv_fft_double(int kfield, int *loens, int *offsets, int nfft) {
-  return plan_fft<Double, CUFFT_Z2D>(kfield, loens, offsets, nfft);
+size_t plan_inv_fft_double(int kfield, int *loens, int *offsets, int nfft,
+                           int allocate) {
+  return plan_fft<Double, CUFFT_Z2D>(kfield, loens, offsets, nfft, allocate);
 }
 }
