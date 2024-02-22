@@ -122,6 +122,9 @@ if( HAVE_GPU )
     endif()
 endif()
 
+set (CMAKE_CUDA_STANDARD 17)
+set (CMAKE_CXX_STANDARD 17)
+
 ectrans_find_lapack()
 
 ### Add sources and tests

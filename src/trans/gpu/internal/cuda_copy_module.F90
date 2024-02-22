@@ -34,11 +34,15 @@ CONTAINS
     REAL(4), POINTER :: DST_PTR(:,:), SRC_PTR(:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_2_REAL_4(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_2_REAL_4(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 2 .AND. LAST_CONTIG_DIM_DST == 2) THEN
       CALL COPY_2_REAL_4_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_2_REAL_4_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -53,6 +57,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -96,11 +101,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 2) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 2) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 2) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 2) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
@@ -167,11 +172,15 @@ CONTAINS
     REAL(8), POINTER :: DST_PTR(:,:), SRC_PTR(:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_2_REAL_8(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_2_REAL_8(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 2 .AND. LAST_CONTIG_DIM_DST == 2) THEN
       CALL COPY_2_REAL_8_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_2_REAL_8_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -186,6 +195,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -229,11 +239,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 2) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 2) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 2) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 2) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
@@ -300,11 +310,15 @@ CONTAINS
     REAL(4), POINTER :: DST_PTR(:,:,:), SRC_PTR(:,:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_3_REAL_4(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_3_REAL_4(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 3 .AND. LAST_CONTIG_DIM_DST == 3) THEN
       CALL COPY_3_REAL_4_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_3_REAL_4_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -319,6 +333,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -362,11 +377,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 3) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 3) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 3) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 3) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
@@ -442,11 +457,15 @@ CONTAINS
     REAL(8), POINTER :: DST_PTR(:,:,:), SRC_PTR(:,:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_3_REAL_8(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_3_REAL_8(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 3 .AND. LAST_CONTIG_DIM_DST == 3) THEN
       CALL COPY_3_REAL_8_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_3_REAL_8_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -461,6 +480,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -504,11 +524,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 3) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 3) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 3) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 3) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
@@ -584,11 +604,15 @@ CONTAINS
     REAL(4), POINTER :: DST_PTR(:,:,:,:), SRC_PTR(:,:,:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_4_REAL_4(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_4_REAL_4(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 4 .AND. LAST_CONTIG_DIM_DST == 4) THEN
       CALL COPY_4_REAL_4_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_4_REAL_4_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -603,6 +627,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:,:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -646,11 +671,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 4) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 4) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 4) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 4) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
@@ -731,11 +756,15 @@ CONTAINS
     REAL(8), POINTER :: DST_PTR(:,:,:,:), SRC_PTR(:,:,:,:)
     INTEGER (KIND=4), INTENT (IN) :: KDIR
     INTEGER (KIND=ACC_HANDLE_KIND), OPTIONAL, INTENT (IN) :: QUEUE
+    INTEGER :: LAST_CONTIG_DIM_DST, LAST_CONTIG_DIM_SRC
 
     SRC_PTR => SRC
     DST_PTR => DST
 
-    IF (IS_CONTIGUOUS(DST_PTR) .AND. IS_CONTIGUOUS(SRC_PTR)) THEN
+    LAST_CONTIG_DIM_SRC = GET_LAST_CONTIGUOUS_DIMENSION_4_REAL_8(SRC_PTR, 0)
+    LAST_CONTIG_DIM_DST = GET_LAST_CONTIGUOUS_DIMENSION_4_REAL_8(DST_PTR, 0)
+
+    IF (LAST_CONTIG_DIM_SRC == 4 .AND. LAST_CONTIG_DIM_DST == 4) THEN
       CALL COPY_4_REAL_8_1D(DST_PTR, SRC_PTR, KDIR, QUEUE)
     ELSE
       CALL COPY_4_REAL_8_2D(DST_PTR, SRC_PTR, KDIR, QUEUE)
@@ -750,6 +779,7 @@ CONTAINS
     INTEGER (KIND=C_SIZE_T) :: ISIZE
 
     ISIZE = KIND (DST) * SIZE(DST(:,:,:,:), KIND=C_SIZE_T)
+
     IF (KDIR == NH2D) THEN
       !$ACC HOST_DATA USE_DEVICE(DST)
       IF(PRESENT(QUEUE))THEN
@@ -793,11 +823,11 @@ CONTAINS
 
     ! We expect that device is always contiguous, and that host has only one non-contiguous dimension
     IF (KDIR == NH2D) THEN
-      IF (.NOT. IS_CONTIGUOUS(DST)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_DST /= 4) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_SRC /= 4) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_SRC
     ELSE IF (KDIR == ND2H) THEN
-      IF (.NOT. IS_CONTIGUOUS(SRC)) CALL ABOR1("device must be contiguous")
+      IF (LAST_CONTIG_DIM_SRC /= 4) CALL ABOR1("device must be contiguous")
       IF (NEXT_CONTIG_DIM_DST /= 4) CALL ABOR1("host must have at most one non-cont dim")
       LAST_CONTIG_DIM = LAST_CONTIG_DIM_DST
     ENDIF
