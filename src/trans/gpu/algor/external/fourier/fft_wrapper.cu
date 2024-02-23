@@ -202,7 +202,7 @@ void execute_fft(typename Type::real *data_real,
     cudaGraph_t new_graph;
     cudaGraphCreate(&new_graph, 0);
     for (int i = 0; i < nfft; ++i) {
-      int offset = offsets[i];
+      size_t offset = (size_t)offsets[i];
       real *data_real_l = &data_real[kfield * offset];
       cmplx *data_complex_l = &data_complex[kfield * offset / 2];
       CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
