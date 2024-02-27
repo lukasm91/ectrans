@@ -426,7 +426,7 @@ CONTAINS
     DO JROC=1,NPROC
       CALL PE2SET(JROC,ISETA,ISETB,ISETW,ISETV)
       ! total recv size is # points per field * # fields
-      IRECVTOT(JROC) = IRECV_WSET_SIZE(ISETW)*IRECV_FIELD_COUNT(ISETV)
+      IRECVTOT(JROC) = 1_JPIB*IRECV_WSET_SIZE(ISETW)*IRECV_FIELD_COUNT(ISETV)
     ENDDO
 
     ! Prepare sender arrays
