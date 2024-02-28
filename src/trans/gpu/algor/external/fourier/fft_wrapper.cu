@@ -103,6 +103,8 @@ void free_fft_cache(float *, size_t) {
   get_ptr_cache<Type, Direction>().clear();
 }
 
+static constexpr bool run_fft_parallel = false;
+
 template <class Type, cufftType Direction>
 size_t plan_fft(int kfield, int *loens, int *offsets, int nfft, bool allocate) {
 
@@ -138,7 +140,10 @@ size_t plan_fft(int kfield, int *loens, int *offsets, int nfft, bool allocate) {
   for (auto const &plan : fftPlans->second) {
     size_t local_worksize;
     CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
-    total_worksize += local_worksize;
+    if (run_fft_parallel)
+      total_worksize += local_worksize;
+    else
+      total_worksize = max(local_worksize, total_worksize);
   }
   return total_worksize;
 }
@@ -187,7 +192,8 @@ void execute_fft(typename Type::real *data_real,
         size_t local_worksize;
         CUFFT_CHECK(cufftGetSize(plan, &local_worksize));
         CUFFT_CHECK(cufftSetWorkArea(plan, (char *)buffer + total_worksize));
-        total_worksize += local_worksize;
+        if (run_fft_parallel)
+          total_worksize += local_worksize;
       }
     }
 
@@ -200,12 +206,16 @@ void execute_fft(typename Type::real *data_real,
 
     // now create the cuda graph
     cudaGraph_t new_graph;
-    cudaGraphCreate(&new_graph, 0);
+    if (run_fft_parallel)
+      cudaGraphCreate(&new_graph, 0);
+    else
+      CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
     for (int i = 0; i < nfft; ++i) {
       size_t offset = (size_t)offsets[i];
       real *data_real_l = &data_real[kfield * offset];
       cmplx *data_complex_l = &data_complex[kfield * offset / 2];
-      CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
+      if (run_fft_parallel)
+        CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
       if constexpr (Direction == CUFFT_R2C)
         CUFFT_CHECK(
             cufftExecR2C(fftPlans->second[i], data_real_l, data_complex_l))
@@ -218,12 +228,16 @@ void execute_fft(typename Type::real *data_real,
       else if constexpr (Direction == CUFFT_Z2D)
         CUFFT_CHECK(
             cufftExecZ2D(fftPlans->second[i], data_complex_l, data_real_l));
-      cudaGraph_t my_graph;
-      CUDA_CHECK(cudaStreamEndCapture(stream, &my_graph));
-      cudaGraphNode_t my_node;
-      CUDA_CHECK(cudaGraphAddChildGraphNode(&my_node, new_graph, nullptr, 0,
-                                            my_graph));
+      if (run_fft_parallel) {
+        cudaGraph_t my_graph;
+        CUDA_CHECK(cudaStreamEndCapture(stream, &my_graph));
+        cudaGraphNode_t my_node;
+        CUDA_CHECK(cudaGraphAddChildGraphNode(&my_node, new_graph, nullptr, 0,
+                                              my_graph));
+      }
     }
+    if (!run_fft_parallel)
+      CUDA_CHECK(cudaStreamEndCapture(stream, &new_graph));
     cudaGraphExec_t instance;
     CUDA_CHECK(cudaGraphInstantiate(&instance, new_graph, NULL, NULL, 0));
     CUDA_CHECK(cudaStreamDestroy(stream));

@@ -80,6 +80,7 @@ foreach( prec sp dp )
     if( HAVE_GPU_AWARE_MPI )
       target_compile_definitions( trans_gpu_object_${prec} PRIVATE USE_CUDA_AWARE_MPI_FT )
     endif()
+    target_compile_definitions( trans_gpu_object_${prec} PRIVATE HUGE_ARRAYS )
 
     ectrans_add_library(
       TARGET           trans_gpu_shared_${prec}
