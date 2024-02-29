@@ -103,7 +103,7 @@ void free_fft_cache(float *, size_t) {
   get_ptr_cache<Type, Direction>().clear();
 }
 
-static constexpr bool run_fft_parallel = false;
+static constexpr bool run_fft_parallel = true;
 
 template <class Type, cufftType Direction>
 size_t plan_fft(int kfield, int *loens, int *offsets, int nfft, bool allocate) {

@@ -51,6 +51,9 @@ use oml_mod ,only : oml_max_threads
 use mpl_module
 use yomgstats, only: jpmaxstat, gstats_lstats => lstats
 use yomhook, only : dr_hook_init
+#ifdef USE_GPU
+use accel_lib
+#endif
 
 implicit none
 
@@ -771,6 +774,11 @@ enddo
 !===================================================================================================
 
 ztloop = (timef() - ztloop)/1000.0_jprd
+
+#ifdef USE_GPU
+write(0,"('memory usage free: ',I12,' / total: ',I12)"), acc_get_free_memory(), acc_get_memory()
+call acc_present_dump
+#endif
 
 write(nout,'(" ")')
 write(nout,'(a)') '======= End of spectral transforms  ======='
