@@ -489,8 +489,13 @@ enddo
 
 ! Allocate grid-point arrays
 if (lvordiv) then
+#if 0
+  jbegin_uv = 3
+  jend_uv = 4
+#else
   jbegin_uv = 1
   jend_uv = 2
+#endif
 endif
 if (luvders) then
   jbegin_uder_EW  = jend_uv + 1
@@ -623,8 +628,13 @@ do jstep = 1, iters+2
        & pspdiv=zspdiv,                     & ! spectral divergence
        & pspsc3a=zspsc3a,                   & ! spectral scalars
        & ldscders=lscders,                  &
+#if 0
+       & ldvorgp=.true.,                   & ! no gridpoint vorticity
+       & lddivgp=.true.,                   & ! no gridpoint divergence
+#else
        & ldvorgp=.false.,                   & ! no gridpoint vorticity
        & lddivgp=.false.,                   & ! no gridpoint divergence
+#endif
        & lduvder=luvders,                   &
        & kvsetuv=ivset,                     &
        & kvsetsc2=ivsetsc,                  &
@@ -653,8 +663,13 @@ do jstep = 1, iters+2
   if (ldump_values) then
     ! dump a field to a binary file
     call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgp2(:,1,:),         'S', noutdump)
+#if 0
+    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,3,:), 'U', noutdump)
+    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,4,:), 'V', noutdump)
+#else
     call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,1,:), 'U', noutdump)
     call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,2,:), 'V', noutdump)
+#endif
     call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgp3a(:,nflevg,1,:), 'T', noutdump)
   endif
 
@@ -668,7 +683,11 @@ do jstep = 1, iters+2
   if (lvordiv) then
     call dir_trans(kresol=1, kproma=nproma, &
       & pgp2=zgmvs(:,1:1,:),                &
+#if 0
+      & pgpuv=zgpuv(:,:,3:4,:),             &
+#else
       & pgpuv=zgpuv(:,:,1:2,:),             &
+#endif
       & pgp3a=zgp3a(:,:,1:nfld,:),          &
       & pspvor=zspvor,                      &
       & pspdiv=zspdiv,                      &
