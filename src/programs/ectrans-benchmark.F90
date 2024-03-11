@@ -162,7 +162,7 @@ integer(kind=jpim) :: nprgpns ! Grid-point decomp
 integer(kind=jpim) :: nprgpew ! Grid-point decomp
 integer(kind=jpim) :: nprtrv = 0 ! Spectral decomp
 integer(kind=jpim) :: nprtrw = 0 ! Spectral decomp
-integer(kind=jpim) :: nspecresmin = 80 ! Minimum spectral resolution, for controlling nprtrw
+integer(kind=jpim) :: nspecresmin = 0 ! Minimum spectral resolution, for controlling nprtrw
 integer(kind=jpim) :: mysetv
 integer(kind=jpim) :: mysetw
 integer(kind=jpim) :: mp_type = 2 ! Message passing type
