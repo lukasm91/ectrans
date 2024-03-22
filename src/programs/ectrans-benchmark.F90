@@ -51,6 +51,9 @@ use oml_mod ,only : oml_max_threads
 use mpl_module
 use yomgstats, only: jpmaxstat, gstats_lstats => lstats
 use yomhook, only : dr_hook_init
+#ifdef USE_GPU
+use openacc
+#endif
 
 implicit none
 
@@ -1056,6 +1059,10 @@ subroutine get_command_line_arguments(nsmax, cgrid, iters, nfld, nlev, lvordiv, 
   integer            :: iarg = 1      ! Argument index
   integer            :: stat          ! For storing success status of string->integer conversion
   integer            :: myproc
+
+#ifdef USE_GPU
+  !$acc init
+#endif
 
   do while (iarg <= command_argument_count())
     call get_command_argument(iarg, carg)
