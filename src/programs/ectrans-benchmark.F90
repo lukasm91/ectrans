@@ -53,6 +53,7 @@ use yomgstats, only: jpmaxstat, gstats_lstats => lstats
 use yomhook, only : dr_hook_init
 #ifdef USE_GPU
 use accel_lib
+use openacc
 #endif
 
 implicit none
@@ -165,7 +166,7 @@ integer(kind=jpim) :: nprgpns ! Grid-point decomp
 integer(kind=jpim) :: nprgpew ! Grid-point decomp
 integer(kind=jpim) :: nprtrv = 0 ! Spectral decomp
 integer(kind=jpim) :: nprtrw = 0 ! Spectral decomp
-integer(kind=jpim) :: nspecresmin = 80 ! Minimum spectral resolution, for controlling nprtrw
+integer(kind=jpim) :: nspecresmin = 0 ! Minimum spectral resolution, for controlling nprtrw
 integer(kind=jpim) :: mysetv
 integer(kind=jpim) :: mysetw
 integer(kind=jpim) :: mp_type = 2 ! Message passing type
@@ -1083,6 +1084,10 @@ subroutine get_command_line_arguments(nsmax, cgrid, iters, nfld, nlev, lvordiv, 
   integer            :: iarg = 1      ! Argument index
   integer            :: stat          ! For storing success status of string->integer conversion
   integer            :: myproc
+
+#ifdef USE_GPU
+  !$acc init
+#endif
 
   do while (iarg <= command_argument_count())
     call get_command_argument(iarg, carg)
