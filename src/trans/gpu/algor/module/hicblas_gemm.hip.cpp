@@ -184,13 +184,12 @@ private:
 };
 } // namespace detail
 
-#ifndef USE_CUTLASS
-
-void hipblas_sgemm_wrapper_grouped(int blas_id, char transa, char transb,
-                                   int m, int *n, int *k, float alpha,
-                                   const float *A, int lda, int64_t *offsetsA,
-                                   const float *B, int *ldb, int64_t *offsetsB, float beta,
-                                   float *C, int ldc, int64_t *offsetsC,
+template <typename T>
+void hipblas_gemm_wrapper_grouped(int blas_id, char transa, char transb,
+                                   int m, int *n, int *k, T alpha,
+                                   const T *A, int lda, int64_t *offsetsA,
+                                   const T *B, int *ldb, int64_t *offsetsB, T beta,
+                                   T *C, int ldc, int64_t *offsetsC,
                                    int batchCount, hipStream_t stream,
                                   void *growing_allocator) {
 
@@ -202,37 +201,14 @@ void hipblas_sgemm_wrapper_grouped(int blas_id, char transa, char transb,
 
   using namespace detail;
 #ifdef USE_GRAPHS_GEMM
-  run_group_graph(hipblas_gemm_grouped<float>(op_t1, op_t2), m, n, k, alpha, A,
+  run_group_graph(hipblas_gemm_grouped<T>(op_t1, op_t2), m, n, k, alpha, A,
                   lda, offsetsA, B, ldb, offsetsB, beta, C, ldc, offsetsC,
                   batchCount, stream, blas_id, growing_allocator);
 #else
-  run_group(hipblas_gemm_grouped<float>(op_t1, op_t2), m, n, k, alpha, A,
+  run_group(hipblas_gemm_grouped<T>(op_t1, op_t2), m, n, k, alpha, A,
             lda, offsetsA, B, ldb, offsetsB, beta, C, ldc, offsetsC,
             batchCount, stream);
 #endif
-}
-
-#endif
-
-void hipblas_dgemm_wrapper_grouped(int blas_id, char transa, char transb,
-                                   int m, int *n, int *k,
-                                   double alpha,
-                                   const double *A, int lda, int64_t *offsetsA,
-                                   const double *B, int *ldb, int64_t *offsetsB,
-                                   double beta,
-                                   double *C, int ldc, int64_t *offsetsC,
-                                   int batchCount, hipStream_t stream, void *) {
-
-  hipblasOperation_t op_t1=HIPBLAS_OP_N, op_t2=HIPBLAS_OP_N;
-  if (transa=='T' || transa=='t')
-    op_t1=HIPBLAS_OP_T;
-  if (transb=='T' || transb=='t')
-    op_t2=HIPBLAS_OP_T;
-
-  using namespace detail;
-  run_group(hipblas_gemm_grouped<double>(op_t1, op_t2), m, n, k, alpha,
-                  A, lda, offsetsA, B, ldb, offsetsB, beta, C, ldc, offsetsC,
-                  batchCount, stream, blas_id);
 }
 
 } // namespace
@@ -300,12 +276,12 @@ void blas_sgemm_wrapper_grouped(int blas_id, char transa, char transb,
                                 int batchCount, size_t stream,
                                 void *growing_allocator) {
 #ifdef USE_CUTLASS
-    cutlass_sgemm_wrapper_grouped(blas_id, transa, transb, m, n, k, alpha, A, lda, offsetsA,
+    cutlass_gemm_wrapper_grouped<float>(blas_id, transa, transb, m, n, k, alpha, A, lda, offsetsA,
                                   B, ldb, offsetsB, beta, C, ldc, offsetsC, batchCount,
                                   *(hipStream_t*)stream,
                                   growing_allocator);
 #else
-    hipblas_sgemm_wrapper_grouped(blas_id, transa, transb, m, n, k, alpha, A, lda,
+    hipblas_gemm_wrapper_grouped<float>(blas_id, transa, transb, m, n, k, alpha, A, lda,
                                   offsetsA, B, ldb, offsetsB, beta, C, ldc,
                                   offsetsC, batchCount,
                                   *(hipStream_t*)stream,
@@ -320,10 +296,17 @@ void blas_dgemm_wrapper_grouped(int blas_id, char transa, char transb,
                                 double *C, int ldc, int64_t *offsetsC,
                                 int batchCount, size_t stream,
                                 void *growing_allocator) {
-    hipblas_dgemm_wrapper_grouped(blas_id, transa, transb, m, n, k, alpha, A, lda, offsetsA, B,
+#ifdef USE_CUTLASS
+    cutlass_gemm_wrapper_grouped<double>(blas_id, transa, transb, m, n, k, alpha, A, lda, offsetsA, B,
+                                  ldb, offsetsB, beta, C, ldc, offsetsC, batchCount,
+                                  *(hipStream_t*)stream,
+                                  growing_allocator);
+#else
+    hipblas_gemm_wrapper_grouped<double>(blas_id, transa, transb, m, n, k, alpha, A, lda, offsetsA, B,
                                 ldb, offsetsB, beta, C, ldc, offsetsC, batchCount,
                                 *(hipStream_t*)stream,
                                 growing_allocator);
+#endif
 }
 }
 
