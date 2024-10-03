@@ -59,10 +59,10 @@ CONTAINS
     !        G. Mozdzynski (Jun 2015): Support alternative FFTs to FFTW
     !     ------------------------------------------------------------------
 
-    USE TPM_GEN,         ONLY: LSYNC_TRANS
+    USE TPM_GEN,         ONLY: LSYNC_TRANS, NCUR_RESOL
     USE PARKIND_ECTRANS, ONLY: JPIM, JPRBT
-    USE TPM_DISTR,       ONLY: MYSETW, D_NPTRLS, D_NDGL_FS, D_NSTAGTF
-    USE TPM_GEOMETRY,    ONLY: G_NLOEN
+    USE TPM_DISTR,       ONLY: MYSETW, D
+    USE TPM_GEOMETRY,    ONLY: G
     USE TPM_HICFFT,      ONLY: EXECUTE_INV_FFT
     USE MPL_MODULE,      ONLY: MPL_BARRIER,MPL_ALL_MS_COMM
     USE TPM_STATS,       ONLY: GSTATS => GSTATS_NVTX
@@ -76,6 +76,8 @@ CONTAINS
     TYPE(FTINV_HANDLE), INTENT(IN) :: HFTINV
 
     INTEGER(KIND=JPIM) :: KGL
+
+    ASSOCIATE(D_NDGL_FS=>D%NDGL_FS, D_NPTRLS=>D%NPTRLS, D_NSTAGTF=>D%NSTAGTF, G_NLOEN=>G%NLOEN)
 
     PREEL_REAL => PREEL_COMPLEX
 
@@ -109,6 +111,8 @@ CONTAINS
 #endif
 
     NULLIFY(PREEL_COMPLEX)
+
+    END ASSOCIATE
 
     !     ------------------------------------------------------------------
   END SUBROUTINE FTINV
