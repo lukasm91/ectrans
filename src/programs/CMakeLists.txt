@@ -7,6 +7,7 @@
 # nor does it submit to any jurisdiction.
 
 #foreach( program ectrans-benchmark ectrans-benchmark-ifs )
+find_package(eccodes)
 foreach( program ectrans-benchmark )
 
   if ( HAVE_CPU )
@@ -19,6 +20,7 @@ foreach( program ectrans-benchmark )
                                   fiat
                                   parkind_${prec}
                                   trans_${prec}
+                                  eccodes_f90
         )
         target_compile_definitions(${program}-cpu-${prec} PRIVATE VERSION="cpu")
       endif()
@@ -36,6 +38,7 @@ foreach( program ectrans-benchmark )
                                   parkind_${prec}
                                   trans_gpu_${prec}
                                   OpenACC::OpenACC_Fortran
+                                  eccodes_f90
                                 DEFINITIONS
                                   VERSION="gpu"
                                   $<$<COMPILE_LANG_AND_ID:Fortran,NVHPC>:USE_PINNED>

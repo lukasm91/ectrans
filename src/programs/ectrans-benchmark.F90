@@ -51,6 +51,15 @@ use oml_mod ,only : oml_max_threads
 use mpl_module
 use yomgstats, only: jpmaxstat, gstats_lstats => lstats
 use yomhook, only : dr_hook_init
+use grib_api, only: grib_new_from_file, &
+                    grib_get, &
+                    grib_get_size, &
+                    grib_release, &
+                    grib_open_file, &
+                    grib_close_file, &
+                    grib_success, &
+                    grib_end_of_file
+
 
 implicit none
 
@@ -210,6 +219,15 @@ character(len=16) :: cgrid = ''
 
 integer(kind=jpim) :: ierr
 
+character(len=128) :: cinput = ''
+character(len=128) :: cfname
+integer :: insf, iret, iread_fields, ilev_max, nbvalues
+integer, dimension(1) :: iparam,igrib,iedition,icurlev
+real(kind=jprb), allocatable :: zfpdat(:,:)
+real(kind=jprb), allocatable :: pgpg(:,:)
+logical :: ldone
+character(len=14) :: filename = "x.xxxx.dat"
+
 !===================================================================================================
 
 #include "setup_trans0.h"
@@ -217,6 +235,8 @@ integer(kind=jpim) :: ierr
 #include "inv_trans.h"
 #include "dir_trans.h"
 #include "trans_inq.h"
+#include "dist_spec.h"
+#include "gath_grid.h"
 #include "specnorm.h"
 #include "abor1.intfb.h"
 #include "gstats_setup.intfb.h"
@@ -228,7 +248,7 @@ luse_mpi = detect_mpirun()
 
 ! Setup
 call get_command_line_arguments(nsmax, cgrid, iters, iters_warmup, nfld, nlev, lvordiv, lscders, luvders, &
-  & luseflt, nopt_mem_tr, nproma, verbosity, ldump_values, lprint_norms, lmeminfo, nprtrv, nprtrw, ncheck)
+  & luseflt, nopt_mem_tr, nproma, verbosity, ldump_values, lprint_norms, lmeminfo, nprtrv, nprtrw, ncheck, cinput)
 if (cgrid == '') cgrid = cubic_octahedral_gaussian_grid(nsmax)
 call parse_grid(cgrid, ndgl, nloen)
 nflevg = nlev
@@ -361,7 +381,6 @@ enddo
 nflevl = numll(mysetv)
 
 ivsetsc(1) = iprused
-ifld = 0
 
 !===================================================================================================
 ! Setup gstats
@@ -459,7 +478,6 @@ nullify(zspsc3a)
 allocate(sp3d(nflevl,nspec2,2+nfld))
 allocate(zspsc2(1,nspec2))
 
-call initialize_spectral_arrays(nsmax, zspsc2, sp3d)
 
 ! Point convenience variables to storage variable sp3d
 zspvor  => sp3d(:,:,1)
@@ -480,6 +498,117 @@ do jb = 1, nprtrv
     ivset(ilev) = jb
   enddo
 enddo
+
+!===================================================================================================
+! Initialize data
+!===================================================================================================
+
+if (cinput == '') then
+  call initialize_spectral_arrays(nsmax, zspsc2, sp3d)
+else
+  !allocate global buffers
+  if (myproc == 1) then
+    allocate(zfpdat(1,nspec2g))
+  endif
+
+  ! open files
+  if(myproc == 1) then
+    call grib_open_file(insf,cinput,'r',iret)
+    if(iret /= grib_success) then
+      write(nerr,*) 'error opening file input spectral file',cinput,iret
+      call abor1('transform_test:error opening file input spectral file')
+    endif
+  endif
+
+  ldone = .false.
+  iread_fields = 0
+  ilev = ilev_max
+  do while (.not. ldone)
+    if(myproc == 1) then
+      ! read and decode spectral field
+      call grib_new_from_file(insf,igrib(1),iret)
+      if(iret == grib_end_of_file) then
+        ldone = .true.
+      endif
+
+      if(.not. ldone) then
+        if(iret /= grib_success) then
+          write(nerr,*) 'error grib_new_from_file',iret
+          call abor1('transform_test:error grib_new_from_file')
+        endif
+
+        call grib_get(igrib(1),'edition',iedition(1),iret)
+        if(iret /= grib_success) then
+          write(nerr,*)'error grib_get edition'
+          call abor1('transform_test:error grib_get edition')
+        endif
+
+        call grib_get(igrib(1),'level',icurlev,iret)
+        if( iret /= grib_success) then
+          write(nerr,*)'error grib_get level'
+          call abor1('transform_test:error grib_get level')
+        endif
+
+        call grib_get(igrib(1),'shortName',cfname,iret)
+        if( iret /= grib_success) then
+          write(nerr,*)'error grib_get shortname'
+          call abor1('transform_test:error grib_get shortname')
+        endif
+
+        call grib_get_size(igrib(1),'values',nbvalues,iret)
+        if(iret /= grib_success) then
+          write(nerr,*)'error grib_get_size values ',iret
+          call abor1('transform_test:error grib_get_size values')
+        endif
+        if(nbvalues /= nspec2g) then
+          write(nerr,*)'size mismatch',nbvalues,nspec2g
+          call abor1('transform_test:error size mismatch')
+        endif
+        call grib_get(igrib(1),'values',zfpdat(1,:),iret)
+        if(iret /= grib_success) then
+          write(nerr,*)'error grib_get values ',iret
+          call abor1('transform_test:error grib_get values')
+        endif
+        call grib_release(igrib(1))
+        ilev=icurlev(1)
+        if ((cfname /= 'z') .and. (ilev < 1 .or. ilev > nflevg)) cycle
+        if (ilev > ilev_max) ilev_max = ilev
+      endif
+    endif
+    call mpl_broadcast(ldone,kroot=1,ktag=1,cdstring='transform_test:')
+    if (.not. ldone) then
+      call mpl_broadcast(cfname,kroot=1,ktag=1,cdstring='transform_test:')
+      call mpl_broadcast(ilev,kroot=1,ktag=1,cdstring='transform_test:')
+      if( cfname == 'vo' ) then
+        iread_fields=iread_fields+1
+        call dist_spec(pspecg=zfpdat,kfdistg=1,kfrom=(/1/),&
+            & pspec=zspvor(ilev:ilev,:),kvset=ivset(ilev:ilev))
+      else if( cfname == 'd' ) then
+        iread_fields=iread_fields+1
+        call dist_spec(pspecg=zfpdat,kfdistg=1,kfrom=(/1/),&
+            & pspec=zspdiv(ilev:ilev,:),kvset=ivset(ilev:ilev))
+      else if( cfname == 't' ) then
+        iread_fields=iread_fields+1
+        call dist_spec(pspecg=zfpdat,kfdistg=1,kfrom=(/1/),&
+            & pspec=zspsc3a(ilev:ilev,:,1),kvset=ivset(ilev:ilev))
+      else if( cfname == 'z' ) then
+        iread_fields=iread_fields+1
+        call dist_spec(pspecg=zfpdat,kfdistg=1,kfrom=(/1/),&
+            & pspec=zspsc2(1:1,:),kvset=ivsetsc(1:1))
+      endif
+    endif
+  enddo
+  if (myproc == 1) then
+    if (ilev_max /= nflevg) call abor1('invalid ilev')
+    if (iread_fields /= 3 * nflevg + 1) call abor1('inconsistent number of fields')
+    call grib_close_file(insf)
+  endif
+
+  ! deallocate resources
+  if(myproc==1) then
+    deallocate(zfpdat)
+  endif
+endif
 
 ! Allocate grid-point arrays
 if (lvordiv) then
@@ -652,12 +781,43 @@ do jstep = 1, iters+iters_warmup
   ! While in grid point space, dump the values to disk, for debugging only
   !=================================================================================================
 
-  if (ldump_values) then
-    ! dump a field to a binary file
-    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgp2(:,1,:),         'S', noutdump)
-    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,1,:), 'U', noutdump)
-    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgpuv(:,nflevg,2,:), 'V', noutdump)
-    call dump_gridpoint_field(jstep, myproc, nproma, ngpblks, zgp3a(:,nflevg,1,:), 'T', noutdump)
+  if (ldump_values .and. mod(jstep,10) == 1) then
+    if (myproc == 1) allocate(pgpg(ngptotg,1))
+    if (myproc == 1) write(filename(3:6),'(i4.4)') jstep
+
+    if (myproc == 1) write(filename(1:1),'(a1)') 's'
+    if (myproc == 1) open(24,file=filename,form='unformatted')
+    do ilev=1,1
+      call gath_grid(pgpg(:,:),nproma,1,(/1/),1,zgp2(:,ilev:ilev,:))
+      write(24) pgpg(:,1)
+    enddo
+    if (myproc == 1) close(24)
+
+    if (myproc == 1) write(filename(1:1),'(a1)') 'u'
+    if (myproc == 1) open(24,file=filename,form='unformatted')
+    do ilev=1,nflevg
+      call gath_grid(pgpg(:,:),nproma,1,(/1/),1,zgpuv(:,ilev:ilev,1,:))
+      write(24) pgpg(:,1)
+    enddo
+    if (myproc == 1) close(24)
+
+    if (myproc == 1) write(filename(1:1),'(a1)') 'v'
+    if (myproc == 1) open(24,file=filename,form='unformatted')
+    do ilev=1,nflevg
+      call gath_grid(pgpg(:,:),nproma,1,(/1/),1,zgpuv(:,ilev:ilev,2,:))
+      write(24) pgpg(:,1)
+    enddo
+    if (myproc == 1) close(24)
+
+    if (myproc == 1) write(filename(1:1),'(a1)') 't'
+    if (myproc == 1) open(24,file=filename,form='unformatted')
+    do ilev=1,nflevg
+      call gath_grid(pgpg(:,:),nproma,1,(/1/),1,zgp3a(:,ilev:ilev,1,:))
+      write(24) pgpg(:,1)
+    enddo
+    if (myproc == 1) close(24)
+
+    if (myproc == 1) deallocate(pgpg(ngptotg,1))
   endif
 
   !=================================================================================================
@@ -1060,7 +1220,7 @@ end subroutine
 
 subroutine get_command_line_arguments(nsmax, cgrid, iters, iters_warmup, nfld, nlev, lvordiv, lscders, luvders, &
   &                                   luseflt, nopt_mem_tr, nproma, verbosity, ldump_values, lprint_norms, &
-  &                                   lmeminfo, nprtrv, nprtrw, ncheck)
+  &                                   lmeminfo, nprtrv, nprtrw, ncheck, cinput)
 
   integer, intent(inout) :: nsmax           ! Spectral truncation
   character(len=16), intent(inout) :: cgrid ! Spectral truncation
@@ -1083,6 +1243,7 @@ subroutine get_command_line_arguments(nsmax, cgrid, iters, iters_warmup, nfld, n
   integer, intent(inout) :: nprtrw          ! Size of W set (spectral decomposition)
   integer, intent(inout) :: ncheck          ! The multiplier of the machine epsilon used as a
                                             ! tolerance for correctness checking
+  character(len=*), intent(inout) :: cinput ! The multiplier of the machine epsilon used as a
 
   character(len=128) :: carg          ! Storage variable for command line arguments
   integer            :: iarg = 1      ! Argument index
@@ -1130,6 +1291,7 @@ subroutine get_command_line_arguments(nsmax, cgrid, iters, iters_warmup, nfld, n
       case('--flt'); luseflt = .True.
       case('--mem-tr'); nopt_mem_tr = get_int_value('--mem-tr', iarg)
       case('--nproma'); nproma = get_int_value('--nproma', iarg)
+      case('--input'); cinput = get_str_value('--input', iarg)
       case('--dump-values'); ldump_values = .true.
       case('--norms'); lprint_norms = .true.
       case('--meminfo'); lmeminfo = .true.
