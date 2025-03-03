@@ -100,9 +100,7 @@ ecbuild_add_option( FEATURE CPU
                     DESCRIPTION "Compile CPU version of ectrans"
                    )
 
-if( HAVE_CPU )
-  ecbuild_find_package( NAME FFTW REQUIRED COMPONENTS double ${single} )
-endif()
+ecbuild_find_package( NAME FFTW REQUIRED COMPONENTS double ${single} )
 
 ecbuild_add_option( FEATURE TRANSI
                     DEFAULT ON

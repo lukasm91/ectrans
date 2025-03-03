@@ -62,4 +62,7 @@ LOGICAL :: LGPNORM = .FALSE.  ! indicates whether transform is being done for gp
 ! is going to recreate the graphs if needed)
 TYPE(GROWING_ALLOCATION_TYPE) :: GROWING_ALLOCATION
 
+! CPU only
+REAL(KIND=JPRB), ALLOCATABLE :: FOUBUF_IN(:)  ! Fourier buffer
+REAL(KIND=JPRB), ALLOCATABLE :: FOUBUF(:)     ! Fourier buffer
 END MODULE TPM_TRANS

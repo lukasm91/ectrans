@@ -163,6 +163,9 @@ foreach( prec dp sp )
                                $<${HAVE_GPU_AWARE_MPI}:USE_GPU_AWARE_MPI>
                                ECTRANS_HAVE_MPI=${ectrans_HAVE_MPI}
         )
+        target_link_libraries( ectrans_gpu_${prec} PRIVATE ${FFTW_LIBRARIES} )
+        target_include_directories( ectrans_gpu_${prec} PRIVATE ${FFTW_INCLUDE_DIRS} )
+        target_compile_definitions( ectrans_gpu_${prec} PRIVATE WITH_FFTW )
 
         # The ecTrans libraries may be linked against an executable with the -cuda flag
         # In that case we must link with -cuda here to ensure compatibility
