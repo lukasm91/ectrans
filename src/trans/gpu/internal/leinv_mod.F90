@@ -115,6 +115,7 @@ CONTAINS
     USE, INTRINSIC :: ISO_C_BINDING, ONLY: C_INT, C_LONG, C_LOC
     USE MPL_MODULE,                  ONLY: MPL_BARRIER,MPL_ALL_MS_COMM
     USE TPM_STATS,                   ONLY: GSTATS => GSTATS_NVTX
+  USE IEEE_ARITHMETIC
 #ifdef ACCGPU
     USE OPENACC_LIB, ONLY: ACC_GET_HIP_STREAM
 #endif
@@ -126,7 +127,7 @@ CONTAINS
 
     IMPLICIT NONE
 
-    REAL(KIND=JPRB),    INTENT(IN)  :: PIA(:,:,:)
+    REAL(KIND=JPRB),    INTENT(INOUT)  :: PIA(:,:,:)
     INTEGER(KIND=JPIM), INTENT(IN)  :: KF_LEG
     REAL(KIND=JPRBT), INTENT(OUT) :: ZINP(:), ZOUTS(:), ZOUTA(:)
     REAL(KIND=JPRD), INTENT(OUT) :: ZINP0(:), ZOUTS0(:), ZOUTA0(:)
@@ -161,6 +162,7 @@ CONTAINS
     HIP_STREAM = 0_C_LONG
 #endif
 
+
     !     ------------------------------------------------------------------
 
     !*       1.       PERFORM LEGENDRE TRANFORM.
@@ -185,17 +187,42 @@ CONTAINS
     !$ACC&     PRESENT(ZAA,ZAS,PIA) &
     !$ACC&     PRESENT(R,R_NSMAX,D_OFFSETS_GEMM2)
 #endif
+    !IF KM=0 and NSMAX is 6: => 2..9
+    !IF KM=0 and NSMAX is 7: => 2...10
+    !IF KM=1 and NSMAX is 6: => 2..8
+    !IF KM=1 and NSMAX is 7: => 2..9
 
     ! READ 2:NSMAX+3
+    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,IA,J) &
+    !$ACC& FIRSTPRIVATE(KF_LEG) DEFAULT(NONE) &
+    !$ACC& ASYNC(1)
+    DO KMLOC=1,D_NUMP
+      DO JK=1,2*KF_LEG
+        KM =  D_MYMS(KMLOC)
+        IA  = 1+MOD(R_NSMAX-KM+2,2)
+        PIA(JK,1,KMLOC) = IEEE_VALUE(1.0_JPRB,IEEE_QUIET_NAN)
+        DO J=R_NSMAX-KM+4,R_NSMAX+4
+          PIA(JK,J,KMLOC) = IEEE_VALUE(1.0_JPRB,IEEE_QUIET_NAN)
+        ENDDO
+      ENDDO
+    ENDDO
 
     !IF KM=0 and NSMAX is 6:
     !    IA=1
-    !    DO=1,6/2+1 ... 1..4
+    !    DO=1,(6+2)/2 ... 1..4
     !       PIA_2=1+1+(J-1)*2 ...2+(0..3)*2 .... 2,4,6,8
     !IF KM=0 and NSMAX is 7:
     !    IA=2
-    !    DO=1,7/2+1 ... 1..4
-    !       PIA_2=2+1+(1..4-1)*2 ...3+(0..3)*2 .... 3,5,7,9
+    !    DO=1,(7+2)/2 ... 1..4
+    !       PIA_2=2+1+(J-1)*2 ...3+(0..3)*2 .... 3,5,7,9
+    !IF KM=1 and NSMAX is 6:
+    !    IA=2
+    !    DO=1,(6+2-1)/2 ... 1..3
+    !       PIA_2=2+1+(J-1)*2 ...3+(0..2)*2 .... 3,5,7
+    !IF KM=1 and NSMAX is 7:
+    !    IA=1
+    !    DO=1,(7+2-1)/2 ... 1..4
+    !       PIA_2=1+1+(J-1)*2 ...2+(0..3)*2 .... 2,4,6,8
 
 #ifdef OMPGPU
     ! Directive incomplete -> putting more variables in SHARED() triggers internal compiler error
@@ -335,12 +362,20 @@ CONTAINS
     ! 2. +++++++++++++ symmetric
     !IF KM=0 and NSMAX is 6:
     !    IS=2
-    !    DO=1,4
-    !       PIA_2=2+1+(0..3)*2 ... 3+(0..3)*2 ... 3,5,7,9
+    !    DO=1,(6+3)/2 = 1..4
+    !       PIA_2=2+1+(J-1)*2 ... 3+(0..3)*2 ... 3,5,7,9
     !IF KM=0 and NSMAX is 7:
     !    IS=1
-    !    DO=1,5
-    !       PIA_2=1+1+(1..5-1)*2 ...2+(0..4)*2 .... 2,4,6,8,10
+    !    DO=1,(7+3)/2 = 1..5
+    !       PIA_2=1+1+(J-1)*2 ... 2+(0..4)*2 .... 2,4,6,8,10
+    !IF KM=1 and NSMAX is 6:
+    !    IS=1
+    !    DO=1,(6-1+3)/2 = 1..4
+    !       PIA_2=1+1+(J-1)*2 ... 2+(0..3)*2 ... 2,4,6,8
+    !IF KM=1 and NSMAX is 7:
+    !    IS=2
+    !    DO=1,(7-1+3)/2 = 1..4
+    !       PIA_2=2+1+(J-1)*2 ... 3+(0..3)*2 .... 3,5,7,9
 
 #ifdef OMPGPU
     ! Directive incomplete -> putting more variables in SHARED() triggers internal compiler error
