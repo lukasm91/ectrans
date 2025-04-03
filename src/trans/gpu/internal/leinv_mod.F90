@@ -135,7 +135,7 @@ CONTAINS
     !     LOCAL
     INTEGER(KIND=JPIM)  :: KS(D%NUMP), NS(D%NUMP)
     INTEGER(KIND=JPIB)  :: AOFFSETS(D%NUMP), BOFFSETS(D%NUMP), COFFSETS(D%NUMP)
-    INTEGER(KIND=JPIM)  :: KM, KMLOC, IA, IS, ISL, J1, JGL, JK, J, IMLOC0(1)
+    INTEGER(KIND=JPIM)  :: KM, KMLOC, ISL, J1, JGL, JK, J, IMLOC0(1)
     INTEGER(KIND=JPIM)  :: IOUT_STRIDES0
     INTEGER(KIND=JPIB)  :: IOUT_SIZE
     INTEGER(KIND=JPIM)  :: IIN_STRIDES0
@@ -185,37 +185,16 @@ CONTAINS
     !$ACC&     PRESENT(ZAA,ZAS,PIA) &
     !$ACC&     PRESENT(R,R_NSMAX,D_OFFSETS_GEMM2)
 #endif
-    !IF KM=0 and NSMAX is 6: => 2..9
-    !IF KM=0 and NSMAX is 7: => 2...10
-    !IF KM=1 and NSMAX is 6: => 2..8
-    !IF KM=1 and NSMAX is 7: => 2..9
-
-    !IF KM=0 and NSMAX is 6:
-    !    IA=1
-    !    DO=1,(6+2)/2 ... 1..4
-    !       PIA_2=1+1+(J-1)*2 ...2+(0..3)*2 .... 2,4,6,8
-    !IF KM=0 and NSMAX is 7:
-    !    IA=2
-    !    DO=1,(7+2)/2 ... 1..4
-    !       PIA_2=2+1+(J-1)*2 ...3+(0..3)*2 .... 3,5,7,9
-    !IF KM=1 and NSMAX is 6:
-    !    IA=2
-    !    DO=1,(6+2-1)/2 ... 1..3
-    !       PIA_2=2+1+(J-1)*2 ...3+(0..2)*2 .... 3,5,7
-    !IF KM=1 and NSMAX is 7:
-    !    IA=1
-    !    DO=1,(7+2-1)/2 ... 1..4
-    !       PIA_2=1+1+(J-1)*2 ...2+(0..3)*2 .... 2,4,6,8
 
 #ifdef OMPGPU
     ! Directive incomplete -> putting more variables in SHARED() triggers internal compiler error
     ! ftn-7991: INTERNAL COMPILER ERROR:  "Too few arguments on the stack"
     !$OMP TARGET TEAMS DISTRIBUTE PARALLEL DO COLLAPSE(2) &
-    !$OMP& PRIVATE(KM,IA,J) &
+    !$OMP& PRIVATE(KM,J) &
     !$OMP& SHARED(D,R,KF_LEG,ZINP,IIN_STRIDES0,IIN0_STRIDES0) MAP(TO:KF_LEG)
 #endif
 #ifdef ACCGPU
-    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,IA,J) &
+    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,J) &
     !$ACC& FIRSTPRIVATE(KF_LEG,IIN_STRIDES0,IIN0_STRIDES0) DEFAULT(NONE) &
 #ifdef _CRAYFTN
     !$ACC&
@@ -226,13 +205,13 @@ CONTAINS
     DO KMLOC=1,D_NUMP
       DO JK=1,2*KF_LEG
         KM =  D_MYMS(KMLOC)
-        IA  = MOD(R_NSMAX-KM+2,2)
         IF(KM /= 0)THEN
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX-KM+2)/2
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,R_NSMAX+3-KM-IA-(J-1)*2,KMLOC)
+            ZINP(JK+((R_NSMAX-KM+2)/2-J)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
+                & PIA(JK,3+2*(J-1),KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
@@ -247,7 +226,8 @@ CONTAINS
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX+2)/2
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,R_NSMAX+3-IA-(J-1)*2,KMLOC)
+            ZINP0((JK-1)/2+1+((R_NSMAX+2)/2-J)*IIN0_STRIDES0) = &
+                & PIA(JK,3+2*(J-1),KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
@@ -343,32 +323,16 @@ CONTAINS
     CALL GSTATS(424,1)
 
     ! 2. +++++++++++++ symmetric
-    !IF KM=0 and NSMAX is 6:
-    !    IS=2
-    !    DO=1,(6+3)/2 = 1..4
-    !       PIA_2=2+1+(J-1)*2 ... 3+(0..3)*2 ... 3,5,7,9
-    !IF KM=0 and NSMAX is 7:
-    !    IS=1
-    !    DO=1,(7+3)/2 = 1..5
-    !       PIA_2=1+1+(J-1)*2 ... 2+(0..4)*2 .... 2,4,6,8,10
-    !IF KM=1 and NSMAX is 6:
-    !    IS=1
-    !    DO=1,(6-1+3)/2 = 1..4
-    !       PIA_2=1+1+(J-1)*2 ... 2+(0..3)*2 ... 2,4,6,8
-    !IF KM=1 and NSMAX is 7:
-    !    IS=2
-    !    DO=1,(7-1+3)/2 = 1..4
-    !       PIA_2=2+1+(J-1)*2 ... 3+(0..3)*2 .... 3,5,7,9
 
 #ifdef OMPGPU
     ! Directive incomplete -> putting more variables in SHARED() triggers internal compiler error
     ! ftn-7991: INTERNAL COMPILER ERROR:  "Too few arguments on the stack"
     !$OMP TARGET TEAMS DISTRIBUTE PARALLEL DO COLLAPSE(2) &
-    !$OMP& PRIVATE(KM,IS,J) &
+    !$OMP& PRIVATE(KM,J) &
     !$OMP& SHARED(D,R,KF_LEG,ZINP,IIN_STRIDES0,IIN0_STRIDES0) MAP(TO:KF_LEG)
 #endif
 #ifdef ACCGPU
-    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,IS,J) &
+    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,J) &
     !$ACC& FIRSTPRIVATE(KF_LEG,IIN_STRIDES0,IIN0_STRIDES0) DEFAULT(NONE) &
 #ifndef _CRAYFTN
     !$ACC& ASYNC(1)
@@ -379,13 +343,13 @@ CONTAINS
     DO KMLOC=1,D_NUMP
       DO JK=1,2*KF_LEG
         KM =  D_MYMS(KMLOC)
-        IS  = MOD(R_NSMAX-KM+1,2)
         IF(KM /= 0) THEN
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX-KM+3)/2
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,R_NSMAX+3-KM-IS-(J-1)*2,KMLOC)
+            ZINP(JK+((R_NSMAX-KM+3)/2-J)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
+                & PIA(JK,2+2*(J-1),KMLOC)
           ENDDO
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           ! those are only needed with tensor cores (zinp might contain NaNs!)
@@ -399,7 +363,8 @@ CONTAINS
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX+3)/2
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,R_NSMAX+3-IS-(J-1)*2,KMLOC)
+            ZINP0((JK-1)/2+1+((R_NSMAX+3)/2-J)*IIN0_STRIDES0) = &
+                & PIA(JK,2+2*(J-1),KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
