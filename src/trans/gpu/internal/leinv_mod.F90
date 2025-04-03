@@ -193,26 +193,6 @@ CONTAINS
     !IF KM=1 and NSMAX is 6: => 2..8
     !IF KM=1 and NSMAX is 7: => 2..9
 
-    ! TODO Merge this into the assignments below
-    !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,IA,J) &
-    !$ACC& FIRSTPRIVATE(KF_LEG) DEFAULT(NONE) &
-    !$ACC& ASYNC(1)
-    DO KMLOC=1,D_NUMP
-      DO JK=1,2*KF_LEG
-        KM =  D_MYMS(KMLOC)
-        IA  = 1+MOD(R_NSMAX-KM+2,2)
-        PIA(JK,1,KMLOC) = IEEE_VALUE(1.0_JPRB,IEEE_QUIET_NAN)
-        DO J=0,(R_NSMAX-KM+2)/2-1
-          TMP = PIA(JK,R_NSMAX-KM+3-J,KMLOC)
-          PIA(JK,R_NSMAX-KM+3-J,KMLOC) = PIA(JK,2+J,KMLOC)
-          PIA(JK,2+J,KMLOC) = TMP
-        ENDDO
-        DO J=R_NSMAX-KM+4,R_NSMAX+4
-          PIA(JK,J,KMLOC) = IEEE_VALUE(1.0_JPRB,IEEE_QUIET_NAN)
-        ENDDO
-      ENDDO
-    ENDDO
-
     !IF KM=0 and NSMAX is 6:
     !    IA=1
     !    DO=1,(6+2)/2 ... 1..4
@@ -249,13 +229,13 @@ CONTAINS
     DO KMLOC=1,D_NUMP
       DO JK=1,2*KF_LEG
         KM =  D_MYMS(KMLOC)
-        IA  = 1+MOD(R_NSMAX-KM+2,2)
+        IA  = MOD(R_NSMAX-KM+2,2)
         IF(KM /= 0)THEN
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX-KM+2)/2
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,IA+1+(J-1)*2,KMLOC)
+            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,R_NSMAX+3-KM-IA-(J-1)*2,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
@@ -270,7 +250,7 @@ CONTAINS
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX+2)/2
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,IA+1+(J-1)*2,KMLOC)
+            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,R_NSMAX+3-IA-(J-1)*2,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
@@ -402,13 +382,13 @@ CONTAINS
     DO KMLOC=1,D_NUMP
       DO JK=1,2*KF_LEG
         KM =  D_MYMS(KMLOC)
-        IS  = 1+MOD(R_NSMAX-KM+1,2)
+        IS  = MOD(R_NSMAX-KM+1,2)
         IF(KM /= 0) THEN
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX-KM+3)/2
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,IS+1+(J-1)*2,KMLOC)
+            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=PIA(JK,R_NSMAX+3-KM-IS-(J-1)*2,KMLOC)
           ENDDO
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           ! those are only needed with tensor cores (zinp might contain NaNs!)
@@ -422,7 +402,7 @@ CONTAINS
           !$ACC LOOP SEQ
 #endif
           DO J=1,(R_NSMAX+3)/2
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,IS+1+(J-1)*2,KMLOC)
+            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = PIA(JK,R_NSMAX+3-IS-(J-1)*2,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
