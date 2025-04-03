@@ -78,7 +78,7 @@ REAL(KIND=JPRB),    INTENT(IN)  :: PF(:,:,:)
 REAL(KIND=JPRB),    INTENT(OUT) :: PNSD(:,:,:)
 
 !     LOCAL INTEGER SCALARS
-INTEGER(KIND=JPIM) :: J, JN, JI, IR, II
+INTEGER(KIND=JPIM) :: J, JN, JI, IR, II, JJ
 
 ASSOCIATE(D_NUMP=>D%NUMP, R_NSMAX=>R%NSMAX, D_MYMS=>D%MYMS)
 
@@ -114,23 +114,23 @@ ASSOCIATE(D_NUMP=>D%NUMP, R_NSMAX=>R%NSMAX, D_MYMS=>D%MYMS)
 #endif
 #endif
 DO KMLOC=1,D_NUMP
-  DO JN=0,R_NSMAX+1
+  DO JJ=0,R_NSMAX+1
     DO J=1,KF_SCALARS
       IR = 2*J-1
       II = IR+1
       KM = D_MYMS(KMLOC)
 
-      IF(KM /= 0 .AND. JN >= KM) THEN
-        ! (DO JN=KN,R_NSMAX+1)
-        JI = JN-KM+2
+      IF(KM /= 0 .AND. JJ <= R_NSMAX+1-KM) THEN
+        JI = JJ + 2
+        JN = JJ + KM
         PNSD(IR,JI,KMLOC) = -(JN-1)*PEPSNM(KMLOC,JN)*PF(IR,JI-1,KMLOC)+&
          &(JN+2)*PEPSNM(KMLOC,JN+1)*PF(IR,JI+1,KMLOC)
         PNSD(II,JI,KMLOC) = -(JN-1)*PEPSNM(KMLOC,JN)*PF(II,JI-1,KMLOC)+&
          &(JN+2)*PEPSNM(KMLOC,JN+1)*PF(II,JI+1,KMLOC)
 
       ELSEIF(KM == 0) THEN
-        ! (DO JN=0,R_NSMAX+1)
-        JI = JN-KM+2
+        JI = JJ + 2
+        JN = JJ + KM
         PNSD(IR,JI,KMLOC) = -(JN-1)*PEPSNM(KMLOC,JN)*PF(IR,JI-1,KMLOC)+&
          &(JN+2)*PEPSNM(KMLOC,JN+1)*PF(IR,JI+1,KMLOC)
       ENDIF

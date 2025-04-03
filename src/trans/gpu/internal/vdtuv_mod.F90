@@ -23,7 +23,7 @@ USE TPM_DISTR,       ONLY: D
 !     Purpose.
 !     --------
 !        In Laplace space compute the the winds
-!        from vorticity and divergence.
+!        from vorticity and divergence. (eq. 2.12/2.13)
 
 !**   Interface.
 !     ----------
@@ -80,7 +80,7 @@ REAL(KIND=JPRB), INTENT(INOUT) :: PVOR(:,:,:),PDIV(:,:,:)
 REAL(KIND=JPRB), INTENT(OUT)   :: PU  (:,:,:),PV  (:,:,:)
 
 !     LOCAL INTEGER SCALARS
-INTEGER(KIND=JPIM) :: II, IJ, IR, J, JN, JI
+INTEGER(KIND=JPIM) :: II, IJ, IR, J, JN, JI, JJ
 
 !     LOCAL REAL SCALARS
 REAL(KIND=JPRBT) :: ZKM
@@ -119,39 +119,40 @@ ASSOCIATE(D_NUMP=>D%NUMP, D_MYMS=>D%MYMS, R_NSMAX=>R%NSMAX, F_RLAPIN=>F%RLAPIN)
 #endif
 #endif
 DO KMLOC=1,D_NUMP
-  DO JN=0,R_NSMAX+1
+  DO JJ=0,R_NSMAX+1
     DO J=1,KFIELD
       IR = 2*J-1
       II = IR+1
       KM = D_MYMS(KMLOC)
       ZKM = REAL(KM,JPRBT)
 
-      IF(KM /= 0 .AND. JN >= KM) THEN
-        ! (DO JN=KN,R_NSMAX)
-        JI = R_NSMAX+3-JN
+      IF(KM /= 0 .AND. JJ <= R_NSMAX+1-KM) THEN
+        JI = JJ + 2
+        JN = JJ + KM
+
         PU(IR,JI,KMLOC) = -ZKM*F_RLAPIN(JN)*PDIV(II,JI,KMLOC)+&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(IR,JI+1,KMLOC)-&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(IR,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(IR,JI-1,KMLOC)-&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(IR,JI+1,KMLOC)
         PU(II,JI,KMLOC) = +ZKM*F_RLAPIN(JN)*PDIV(IR,JI,KMLOC)+&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(II,JI+1,KMLOC)-&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(II,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(II,JI-1,KMLOC)-&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(II,JI+1,KMLOC)
         PV(IR,JI,KMLOC) = -ZKM*F_RLAPIN(JN)*PVOR(II,JI,KMLOC)-&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(IR,JI+1,KMLOC)+&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(IR,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(IR,JI-1,KMLOC)+&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(IR,JI+1,KMLOC)
         PV(II,JI,KMLOC) = +ZKM*F_RLAPIN(JN)*PVOR(IR,JI,KMLOC)-&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(II,JI+1,KMLOC)+&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(II,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(II,JI-1,KMLOC)+&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(II,JI+1,KMLOC)
 
       ELSEIF(KM == 0) THEN
-        ! (DO JN=0,R_NSMAX)
-        JI = R_NSMAX+3-JN
+        JI = JJ + 2
+        JN = JJ + KM
 
         PU(IR,JI,KMLOC) = +&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(IR,JI+1,KMLOC)-&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(IR,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PVOR(IR,JI-1,KMLOC)-&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PVOR(IR,JI+1,KMLOC)
         PV(IR,JI,KMLOC) = -&
-         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(IR,JI+1,KMLOC)+&
-         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(IR,JI-1,KMLOC)
+         &(JN-1)*PEPSNM(KMLOC,JN)*F_RLAPIN(JN-1)*PDIV(IR,JI-1,KMLOC)+&
+         &(JN+2)*PEPSNM(KMLOC,JN+1)*F_RLAPIN(JN+1)*PDIV(IR,JI+1,KMLOC)
       ENDIF
     ENDDO
   ENDDO

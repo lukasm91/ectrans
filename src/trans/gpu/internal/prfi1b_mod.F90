@@ -109,19 +109,19 @@ MODULE PRFI1B_MOD
 #endif
 #endif
     DO KMLOC=1,D_NUMP
-      DO JN=0,R_NSMAX+4
+      DO JN=0,R_NSMAX+3
         DO JFLD=1,KFIELDS
           KM = D_MYMS(KMLOC)
 
-          IF (JN <= 1) THEN
+          IF (JN <= 0) THEN
               PIA(2*JFLD-1,JN+1,KMLOC) = 0.0_JPRB
               PIA(2*JFLD  ,JN+1,KMLOC) = 0.0_JPRB
-          ELSEIF (JN <= R_NSMAX+2-KM) THEN
+          ELSEIF (JN <= R_NSMAX+1-KM) THEN
               IASM0 = D_NASM0(KM)
-              INM = IASM0+((R_NSMAX+2-JN)-KM)*2
+              INM = IASM0+(JN-1)*2
               PIA(2*JFLD-1,JN+1,KMLOC) = PSPEC(JFLD,INM  )
               PIA(2*JFLD  ,JN+1,KMLOC) = PSPEC(JFLD,INM+1)
-          ELSEIF (JN <= R_NSMAX+4-KM) THEN
+          ELSEIF (JN <= R_NSMAX+3-KM) THEN
               PIA(2*JFLD-1,JN+1,KMLOC) = 0.0_JPRB
               PIA(2*JFLD  ,JN+1,KMLOC) = 0.0_JPRB
           ENDIF

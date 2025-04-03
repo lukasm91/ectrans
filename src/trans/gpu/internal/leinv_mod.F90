@@ -193,6 +193,7 @@ CONTAINS
     !IF KM=1 and NSMAX is 6: => 2..8
     !IF KM=1 and NSMAX is 7: => 2..9
 
+    ! TODO Merge this into the assignments below
     !$ACC PARALLEL LOOP COLLAPSE(2) PRIVATE(KM,IA,J) &
     !$ACC& FIRSTPRIVATE(KF_LEG) DEFAULT(NONE) &
     !$ACC& ASYNC(1)
