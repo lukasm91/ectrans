@@ -121,7 +121,6 @@ CONTAINS
     USE TPM_STATS,              ONLY: GSTATS => GSTATS_NVTX
     USE ISO_C_BINDING,          ONLY: C_SIZE_T, C_LOC, C_SIZEOF, C_F_POINTER
 
-  USE IEEE_ARITHMETIC
     !**** *LTINV* - Inverse Legendre transform
     !
     !     Purpose.
@@ -207,8 +206,6 @@ CONTAINS
 
     REAL(KIND=JPRBT), POINTER :: ZINP(:)
     REAL(KIND=JPRD), POINTER :: ZINP0(:)
-    INTEGER(KIND=JPIM)  :: KM, KMLOC, IA, IS, ISL, J1, JGL, JK, J, IMLOC0(1)
-    REAL(KIND=JPRB) :: TMP
 
     ASSOCIATE(ZEPSNM=>FG%ZEPSNM)
 
