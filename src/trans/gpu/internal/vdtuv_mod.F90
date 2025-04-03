@@ -126,6 +126,7 @@ DO KMLOC=1,D_NUMP
       KM = D_MYMS(KMLOC)
       ZKM = REAL(KM,JPRBT)
 
+      ! for JN=KM...NSMAX+1 (consider eq. 2.14)
       IF(KM /= 0 .AND. JJ <= R_NSMAX+1-KM) THEN
         JI = JJ + 2
         JN = JJ + KM

@@ -114,14 +114,17 @@ MODULE PRFI1B_MOD
           KM = D_MYMS(KMLOC)
 
           IF (JN <= 0) THEN
+              ! Zero the first row of PIA because this simplifies vdtuv/spnsde
               PIA(2*JFLD-1,JN+1,KMLOC) = 0.0_JPRB
               PIA(2*JFLD  ,JN+1,KMLOC) = 0.0_JPRB
           ELSEIF (JN <= R_NSMAX+1-KM) THEN
+              ! Fill in the wave numbers from KM to NSMAX into 2..(NSMAX+2-KM)
               IASM0 = D_NASM0(KM)
               INM = IASM0+(JN-1)*2
               PIA(2*JFLD-1,JN+1,KMLOC) = PSPEC(JFLD,INM  )
               PIA(2*JFLD  ,JN+1,KMLOC) = PSPEC(JFLD,INM+1)
           ELSEIF (JN <= R_NSMAX+3-KM) THEN
+              ! Zero the two extra row of PIA to simplify vdtuv/spnsde
               PIA(2*JFLD-1,JN+1,KMLOC) = 0.0_JPRB
               PIA(2*JFLD  ,JN+1,KMLOC) = 0.0_JPRB
           ENDIF

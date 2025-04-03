@@ -209,15 +209,15 @@ CONTAINS
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
-          DO J=1,(R_NSMAX-KM+2)/2
-            ZINP(JK+((R_NSMAX-KM+2)/2-J)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
-                & PIA(JK,3+2*(J-1),KMLOC)
+          DO J=1,R_NSMAX-KM+1,2
+            ZINP(JK+((R_NSMAX-KM)/2-(J-1)/2)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
+                & PIA(JK,2+J,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           !$ACC LOOP SEQ
-          DO J=(R_NSMAX-KM+2)/2+1,ALIGN((R_NSMAX-KM+2)/2,A)
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=0
+          DO J=(R_NSMAX-KM)/2+1,ALIGN((R_NSMAX-KM)/2+1,A)-1
+            ZINP(JK+J*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=0
           ENDDO
 #endif
         ELSEIF (MOD((JK-1),2) .EQ. 0) THEN
@@ -225,15 +225,15 @@ CONTAINS
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
-          DO J=1,(R_NSMAX+2)/2
-            ZINP0((JK-1)/2+1+((R_NSMAX+2)/2-J)*IIN0_STRIDES0) = &
-                & PIA(JK,3+2*(J-1),KMLOC)
+          DO J=1,R_NSMAX+1,2
+            ZINP0((JK-1)/2+1+(R_NSMAX/2-(J-1)/2)*IIN0_STRIDES0) = &
+                & PIA(JK,2+J,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           !$ACC LOOP SEQ
-          DO J=(R_NSMAX+2)/2+1,ALIGN((R_NSMAX+2)/2,A)
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = 0
+          DO J=R_NSMAX/2+1,ALIGN(R_NSMAX/2+1,A)-1
+            ZINP0((JK-1)/2+1+J*IIN0_STRIDES0) = 0
           ENDDO
 #endif
         ENDIF
@@ -279,7 +279,7 @@ CONTAINS
 
     DO KMLOC=1,D_NUMP
       KM = D_MYMS(KMLOC)
-      KS(KMLOC) = (R_NSMAX-KM+2)/2
+      KS(KMLOC) = (R_NSMAX-KM+2)/2 ! 1, 3..., R_NSMAX-KM+1
       NS(KMLOC) = G_NDGLU(KM)
       AOFFSETS(KMLOC) = IIN_STRIDES0*D_OFFSETS_GEMM2(KMLOC)
       BOFFSETS(KMLOC) = D%OFFSETS_GEMM_MATRIX(KMLOC)
@@ -347,30 +347,30 @@ CONTAINS
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
-          DO J=1,(R_NSMAX-KM+3)/2
-            ZINP(JK+((R_NSMAX-KM+3)/2-J)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
-                & PIA(JK,2+2*(J-1),KMLOC)
+          DO J=0,R_NSMAX-KM+1,2
+            ZINP(JK+((R_NSMAX-KM+1)/2-J/2)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)= &
+                & PIA(JK,2+J,KMLOC)
           ENDDO
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           ! those are only needed with tensor cores (zinp might contain NaNs!)
           !$ACC LOOP SEQ
-          DO J=(R_NSMAX-KM+3)/2+1,ALIGN((R_NSMAX-KM+3)/2,A)
-            ZINP(JK+(J-1)*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=0
+          DO J=(R_NSMAX-KM+1)/2+1,ALIGN((R_NSMAX-KM+1)/2,A)-1
+            ZINP(JK+J*IIN_STRIDES0+D_OFFSETS_GEMM2(KMLOC)*IIN_STRIDES0)=0
           ENDDO
 #endif
         ELSEIF (MOD((JK-1),2) == 0) THEN
 #ifdef ACCGPU
           !$ACC LOOP SEQ
 #endif
-          DO J=1,(R_NSMAX+3)/2
-            ZINP0((JK-1)/2+1+((R_NSMAX+3)/2-J)*IIN0_STRIDES0) = &
-                & PIA(JK,2+2*(J-1),KMLOC)
+          DO J=0,R_NSMAX+1,2
+            ZINP0((JK-1)/2+1+((R_NSMAX+1)/2-J/2)*IIN0_STRIDES0) = &
+                & PIA(JK,2+J,KMLOC)
           ENDDO
           ! those are only needed with tensor cores (zinp might contain NaNs!)
 #if defined(USE_CUTLASS) && defined(USE_CUTLASS_3XTF32)
           !$ACC LOOP SEQ
-          DO J=(R_NSMAX+3)/2+1,ALIGN((R_NSMAX+3)/2,A)
-            ZINP0((JK-1)/2+1+(J-1)*IIN0_STRIDES0) = 0
+          DO J=(R_NSMAX+1)/2+1,ALIGN((R_NSMAX+1)/2+1,A)-1
+            ZINP0((JK-1)/2+1+J*IIN0_STRIDES0) = 0
           ENDDO
 #endif
         ENDIF
@@ -413,7 +413,7 @@ CONTAINS
 
     DO KMLOC=1,D_NUMP
       KM = D_MYMS(KMLOC)
-      KS(KMLOC) = (R_NSMAX-KM+3)/2
+      KS(KMLOC) = (R_NSMAX-KM+1)/2+1 ! 0, 2..., R_NSMAX-KM+1
       NS(KMLOC) = G_NDGLU(KM)
       AOFFSETS(KMLOC) = IIN_STRIDES0*D_OFFSETS_GEMM2(KMLOC)
       BOFFSETS(KMLOC) = D%OFFSETS_GEMM_MATRIX(KMLOC)

@@ -120,6 +120,7 @@ DO KMLOC=1,D_NUMP
       II = IR+1
       KM = D_MYMS(KMLOC)
 
+      ! for JN=KM...NSMAX+1 (similar to eq. 2.14)
       IF(KM /= 0 .AND. JJ <= R_NSMAX+1-KM) THEN
         JI = JJ + 2
         JN = JJ + KM
