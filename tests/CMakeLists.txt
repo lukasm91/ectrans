@@ -80,6 +80,7 @@ add_subdirectory( trans/api )
 # --------------------------------------------------------------------------------------------------
 
 add_subdirectory( trans/adjoint )
+add_subdirectory( trans/components )
 
 # --------------------------------------------------------------------------------------------------
 # Add field-view metadata test
