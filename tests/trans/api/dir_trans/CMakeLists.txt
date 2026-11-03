@@ -1,4 +1,5 @@
 # (C) Copyright 2025- ECMWF.
+# (C) Copyright 2026- NVIDIA.
 #
 # This software is licensed under the terms of the Apache Licence Version 2.0
 # which can be obtained at http://www.apache.org/licenses/LICENSE-2.0.
@@ -10,6 +11,7 @@
 
 # Define list of DIR_TRANS tests
 set( test_list
+  ectrans_test_trans_api_analytic_fields
   ectrans_test_trans_api_dir_trans_call_mode_1_scalar_1
   ectrans_test_trans_api_dir_trans_call_mode_1_wind_1
   ectrans_test_trans_api_dir_trans_call_mode_1_wind_1_scalar_1
@@ -27,6 +29,14 @@ generate_api_test_suite( SUITE_NAME dir_trans_test_suite
                          WILL_FAIL_LIST ${will_fail_list}
                          MPIxOMPS 0x1 0x8 1x1 1x8 2x1 2x8
                          BACKENDS cpu_sp cpu_dp gpu_sp gpu_dp )
+
+# The GPU adjoint requires stored Legendre coefficients.
+foreach( precision sp dp )
+  if( TARGET dir_trans_test_suite_gpu_${precision} )
+    target_compile_definitions( dir_trans_test_suite_gpu_${precision} PRIVATE
+      ECTRANS_TEST_GPU )
+  endif()
+endforeach()
 
 set( field_view_test_list
   ectrans_test_trans_api_dir_trans_field_view_call_mode_1_scalar_1
