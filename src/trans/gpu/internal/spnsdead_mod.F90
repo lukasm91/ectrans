@@ -117,18 +117,16 @@ DO KMLOC=1,D_NUMP
       II = IR+1
       KM = D_MYMS(KMLOC)
 
-      IF(KM /= 0 .AND. JN >= KM) THEN
-        ! (DO JN=KN,R_NSMAX+1)
-        JI = R_NSMAX+3-JN
-        PF(IR,JI+1,KMLOC) = PF(IR,JI+1,KMLOC) - (JN-1)*PEPSNM(KMLOC,JN)*PNSD(IR,JI,KMLOC)
-        PF(IR,JI-1,KMLOC) = PF(IR,JI-1,KMLOC) + (JN+2)*PEPSNM(KMLOC,JN+1)*PNSD(IR,JI,KMLOC)
-        PF(II,JI+1,KMLOC) = PF(II,JI+1,KMLOC) - (JN-1)*PEPSNM(KMLOC,JN)*PNSD(II,JI,KMLOC)
-        PF(II,JI-1,KMLOC) = PF(II,JI-1,KMLOC) + (JN+2)*PEPSNM(KMLOC,JN+1)*PNSD(II,JI,KMLOC) 
-      ELSEIF(KM == 0) THEN
-        ! (DO JN=0,R_NSMAX+1)
-        JI = R_NSMAX+3-JN
-        PF(IR,JI+1,KMLOC) = PF(IR,JI+1,KMLOC) - (JN-1)*PEPSNM(KMLOC,JN)*PNSD(IR,JI,KMLOC)
-        PF(IR,JI-1,KMLOC) = PF(IR,JI-1,KMLOC) + (JN+2)*PEPSNM(KMLOC,JN+1)*PNSD(IR,JI,KMLOC)
+      ! Gather both neighbouring contributions into one output coefficient.
+      ! Scattering to JI+/-1 races when degrees are processed in parallel.
+      JI = R_NSMAX+3-JN
+      IF(JN >= KM) THEN
+        PF(IR,JI,KMLOC) = PF(IR,JI,KMLOC) - JN*PEPSNM(KMLOC,JN+1)*PNSD(IR,JI-1,KMLOC) &
+          & + (JN+1)*PEPSNM(KMLOC,JN)*PNSD(IR,JI+1,KMLOC)
+        IF(KM /= 0) THEN
+          PF(II,JI,KMLOC) = PF(II,JI,KMLOC) - JN*PEPSNM(KMLOC,JN+1)*PNSD(II,JI-1,KMLOC) &
+            & + (JN+1)*PEPSNM(KMLOC,JN)*PNSD(II,JI+1,KMLOC)
+        ENDIF
       ENDIF
     ENDDO
   ENDDO

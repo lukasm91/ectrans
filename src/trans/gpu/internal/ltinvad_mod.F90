@@ -283,7 +283,24 @@ CONTAINS
 
     ! Legendre transforms. When converting PIA into ZOUT, we ignore the first entries of LEINV.
     ! This is because vorticity and divergence is not necessarily converted to GP space.
-    PIA_LEDIR => PIA(2*(IF_READIN-IF_LEG)+1:IF_READIN,:,:)
+    ! Include both real and imaginary components of every retained field.
+    PIA_LEDIR => PIA(2*(IF_READIN-IF_LEG)+1:2*IF_READIN,:,:)
+    ! AD accumulates into vorticity/divergence even when their grid outputs
+    ! are absent. Also initialise the unused boundary coefficients.
+#ifdef OMPGPU
+!$OMP TARGET TEAMS DISTRIBUTE PARALLEL DO COLLAPSE(3) ECTRANS_OMP_DEFAULT_CLAUSE &
+!$OMP& ECTRANS_DEVICE_ADDR_CLAUSE(PIA)
+#endif
+#ifdef ACCGPU
+    !$ACC PARALLEL LOOP COLLAPSE(3) PRESENT(PIA) ASYNC(1)
+#endif
+    DO KMLOC=1,SIZE(PIA,3)
+      DO J=1,SIZE(PIA,2)
+        DO JK=1,SIZE(PIA,1)
+          PIA(JK,J,KMLOC)=0.0_JPRB
+        ENDDO
+      ENDDO
+    ENDDO
     CALL LEDIR(ALLOCATOR,ZOUTS,ZOUTA,ZOUTS0,ZOUTA0,ZINP,ZINP0,PIA_LEDIR,IF_LEG)
 
 #ifdef OMPGPU
